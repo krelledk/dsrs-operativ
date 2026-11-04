@@ -53,7 +53,7 @@ try {
 
     if ($action === 'login' && $method === 'POST') {
         $body = body();
-        $code = trim((string) ($body['code'] ?? ''));
+        $code = strtolower(trim((string) ($body['code'] ?? '')));
         if (!password_verify($code, $config['admin_code_hash'])) {
             usleep(350000);
             audit($db, 'login_failed', null, ['ip' => clientIp()]);
@@ -76,7 +76,7 @@ try {
 
     if ($action === 'subscribe' && $method === 'POST') {
         $body = body();
-        $stationCode = trim((string) ($body['stationCode'] ?? ''));
+        $stationCode = strtolower(trim((string) ($body['stationCode'] ?? '')));
         if (!password_verify($stationCode, $config['station_code_hash'])) {
             usleep(350000);
             respond(['ok' => false, 'error' => 'Forkert stationskode.'], 401);
