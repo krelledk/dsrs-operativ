@@ -1,0 +1,11 @@
+{
+  "name": "Alarmberedskab",
+  "short_name": "Alarm",
+  "description": "Modtag og kvittér beredskabsalarmer.",
+  "start_url": "./#responder",
+  "display": "standalone",
+  "background_color": "#07101a",
+  "theme_color": "#08121e",
+  "lang": "da-DK",
+  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

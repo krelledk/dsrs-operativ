@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#08121e">
+  <meta name="description" content="MVP til udsendelse og modtagelse af beredskabsalarmer.">
+  <title>Alarmberedskab</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css?v=2">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Primær navigation">
+      <a class="brand" href="#control" aria-label="Alarmberedskab – forsiden">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <span><strong>Alarm</strong><small>Beredskab</small></span>
+      </a>
+
+      <nav class="main-nav">
+        <a href="#control" data-view-link="control" class="active">
+          <span class="nav-icon">◉</span><span>Kontrolcentral</span>
+        </a>
+        <a href="#responder" data-view-link="responder">
+          <span class="nav-icon">↗</span><span>Mandskabsapp</span>
+        </a>
+        <a href="#roadmap" data-view-link="roadmap">
+          <span class="nav-icon">⌁</span><span>Projektmapping</span>
+        </a>
+      </nav>
+
+      <div class="system-card">
+        <span class="status-dot online"></span>
+        <div><strong>Demo-system</strong><small>Lokalt alarmflow aktivt</small></div>
+      </div>
+      <p class="sidebar-note">MVP · 04.11.2026</p>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <button class="menu-button" aria-label="Åbn menu">☰</button>
+        <div>
+          <span class="eyebrow">OPERATIV PLATFORM</span>
+          <h1 id="page-title">Kontrolcentral</h1>
+        </div>
+        <div class="topbar-actions">
+          <span class="clock" id="clock">--:--:--</span>
+          <button class="ghost-button" id="open-app-button"><span>↗</span> Åbn mandskabsapp</button>
+        </div>
+      </header>
+
+      <section class="view active" id="control-view" data-view="control">
+        <div class="overview-grid">
+          <article class="metric-card accent">
+            <span class="metric-label">AKTIVE ALARMER</span>
+            <strong id="metric-active">1</strong>
+            <small><span class="pulse-dot"></span> Live opdatering</small>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">MELDT KLAR</span>
+            <strong id="metric-ready">12</strong>
+            <small>af 16 personer</small>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">GENNEMSNITLIG KVITTERING</span>
+            <strong>00:41</strong>
+            <small>mål: under 01:00</small>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">SYSTEMSTATUS</span>
+            <strong class="system-ok">Stabil</strong>
+            <small>Seneste check for 18 sek. siden</small>
+          </article>
+        </div>
+
+        <div class="control-grid">
+          <section class="panel dispatch-panel">
+            <div class="panel-heading">
+              <div><span class="eyebrow">NY HÆNDELSE</span><h2>Udsend alarm</h2></div>
+              <span class="hotkey">⌘ Enter</span>
+            </div>
+            <form id="alarm-form">
+              <div class="field-row">
+                <label>Alarmtype
+                  <select id="alarm-type" required>
+                    <option>Bygningsbrand</option>
+                    <option>Redningsopgave</option>
+                    <option>Miljøuheld</option>
+                    <option>Automatisk brandalarm</option>
+                    <option>Assistance</option>
+                    <option>Testalarm</option>
+                  </select>
+                </label>
+                <label>Prioritet
+                  <select id="alarm-priority" required>
+                    <option value="critical">Akut · P1</option>
+                    <option value="high">Høj · P2</option>
+                    <option value="normal">Normal · P3</option>
+                    <option value="test">Test</option>
+                  </select>
+                </label>
+              </div>
+              <label>Adresse / position
+                <div class="input-with-icon"><span>⌖</span><input id="alarm-location" required value="Havnevej 14, 4600 Køge"></div>
+              </label>
+              <label>Supplerende melding
+                <textarea id="alarm-message" rows="3">Røg fra tagkonstruktion. Personer meldes ude. Indsatsleder på vej.</textarea>
+              </label>
+              <fieldset>
+                <legend>Alarmér enheder</legend>
+                <div class="unit-picker">
+                  <label><input type="checkbox" value="Hold 1" checked><span><b>H1</b><em>Hold 1</em><small>6 personer</small></span></label>
+                  <label><input type="checkbox" value="Tankvogn" checked><span><b>TV</b><em>Tankvogn</em><small>2 personer</small></span></label>
+                  <label><input type="checkbox" value="Indsatsleder"><span><b>IL</b><em>Indsatsleder</em><small>1 person</small></span></label>
+                  <label><input type="checkbox" value="Alle"><span><b>∞</b><em>Alle</em><small>16 personer</small></span></label>
+                </div>
+              </fieldset>
+              <div class="dispatch-footer">
+                <div class="recipient-summary"><span id="recipient-count">8</span> modtagere · Push + lyd</div>
+                <button class="alarm-button" type="submit"><span>●</span> UDSEND ALARM</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="panel response-panel">
+            <div class="panel-heading">
+              <div><span class="eyebrow">SENESTE ALARM</span><h2>Kvitteringer</h2></div>
+              <span class="live-badge"><span></span> LIVE</span>
+            </div>
+            <div id="latest-alarm-summary" class="alarm-summary"></div>
+            <div class="delivery-track" id="delivery-track" aria-label="Leveringsstatus"></div>
+            <div class="response-stats">
+              <div><strong id="response-accepted">5</strong><span>Accepteret</span></div>
+              <div><strong id="response-rejected">1</strong><span>Ej accepteret</span></div>
+              <div><strong id="response-wait">2</strong><span>Afventer svar</span></div>
+            </div>
+            <div class="progress"><span id="response-progress" style="width:100%"></span></div>
+            <div class="crew-list" id="crew-list"></div>
+          </section>
+        </div>
+
+        <section class="panel event-log-panel">
+          <div class="panel-heading">
+            <div><span class="eyebrow">SPORBARHED</span><h2>Hændelseslog</h2></div>
+            <button class="text-button" id="clear-demo">Nulstil demo</button>
+          </div>
+          <div class="event-log" id="event-log"></div>
+        </section>
+      </section>
+
+      <section class="view" id="responder-view" data-view="responder">
+        <div class="responder-layout">
+          <section class="phone-frame" aria-label="Mobilapp-preview">
+            <div class="phone-status"><span>09:41</span><span>● ◔ ▰</span></div>
+            <div class="app-header">
+              <div class="app-logo"><span class="brand-mark mini"><span></span></span><b>Alarmberedskab</b></div>
+              <span class="avatar">MA</span>
+            </div>
+            <div class="app-body">
+              <div class="app-state"><span class="status-dot online"></span> Du er meldt klar</div>
+              <article class="mobile-alarm" id="mobile-alarm"></article>
+              <div class="app-actions" id="response-actions">
+                <button data-response="accepted" class="yes">✓<span>ACCEPTERET</span></button>
+                <button data-response="rejected" class="no">×<span>EJ ACCEPTERET</span></button>
+              </div>
+              <div class="response-confirmation" id="response-confirmation" hidden></div>
+              <section class="app-card">
+                <span class="eyebrow">DIN STATUS</span>
+                <div class="availability-row"><span>Næste 12 timer</span><b><span class="status-dot online"></span> Tilgængelig</b></div>
+              </section>
+              <section class="app-card">
+                <span class="eyebrow">SENESTE HÆNDELSER</span>
+                <div id="mobile-history"></div>
+              </section>
+            </div>
+            <nav class="app-tabbar"><span class="selected">◉<small>Alarm</small></span><span>◷<small>Vagt</small></span><span>◇<small>Status</small></span><span>☰<small>Mere</small></span></nav>
+          </section>
+
+          <aside class="app-setup">
+            <span class="eyebrow">APP · MVP</span>
+            <h2>Test alarmflowet på denne enhed</h2>
+            <p>Åbn kontrolcentralen og appen i hver sin fane. Når du udsender en alarm, opdateres appen straks og kan vise en browsernotifikation.</p>
+            <div class="setup-steps">
+              <div><span>1</span><p><b>Tillad notifikationer</b><small>Browseren kræver dit aktive samtykke.</small></p></div>
+              <div><span>2</span><p><b>Åbn som separat fane</b><small>Simulerer den mobile modtagers app.</small></p></div>
+              <div><span>3</span><p><b>Send og kvittér</b><small>Modtaget, notifikation vist og dit svar vises live i kontrolcentralen.</small></p></div>
+            </div>
+            <button id="notification-button" class="primary-button">Aktivér pushnotifikationer</button>
+            <button id="install-button" class="secondary-button" hidden>Installer app</button>
+            <button id="new-tab-button" class="secondary-button">Åbn app i ny fane</button>
+            <div class="scope-note"><b>Måldomæne</b><p>Produktionsadressen bliver <strong>alarm.hansenlabs.dk</strong>. Denne MVP bruger browserens lokale lager og BroadcastChannel; push mellem forskellige telefoner kræver backend, brugerlogin og APNs/FCM/leverandørintegration.</p></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view" id="roadmap-view" data-view="roadmap">
+        <div class="roadmap-hero">
+          <div><span class="eyebrow">FRA MVP TIL DRIFT</span><h2>Projektmapping</h2><p>En trinvis vej fra lokal alarmdemo til en robust platform for beredskaber.</p></div>
+          <div class="roadmap-status"><span>NU</span><b>Fase 0 · Koncept & prototype</b><small>Kontrolcentral + modtagerflow</small></div>
+        </div>
+
+        <div class="phase-grid">
+          <article class="phase current"><span class="phase-no">00</span><small>NU · 1–2 UGER</small><h3>Prototype</h3><p>Validér operatørflow, alarmdata, kvittering og mobiloplevelse.</p><ul><li>Kontrolcentral-web</li><li>Installerbar PWA</li><li>Lokal push-demo</li><li>Domænemodel og backlog</li></ul></article>
+          <article class="phase"><span class="phase-no">01</span><small>3–5 UGER</small><h3>Teknisk MVP</h3><p>Rigtige brugere, enheder og fjern-push på tværs af telefoner.</p><ul><li>API + database</li><li>Login, roller og organisationer</li><li>FCM / APNs push</li><li>Auditlog og basisdrift</li></ul></article>
+          <article class="phase"><span class="phase-no">02</span><small>4–8 UGER</small><h3>Pilotdrift</h3><p>Test med én organisation, vagtplaner og realistiske beredskabsflows.</p><ul><li>Vagt og tilgængelighed</li><li>Eskaleringsregler</li><li>Offline og redundans</li><li>Overvågning og support</li></ul></article>
+          <article class="phase"><span class="phase-no">03</span><small>LØBENDE</small><h3>Platform</h3><p>Integrationer, rapportering og skalering til flere organisationer.</p><ul><li>CAD/API-integrationer</li><li>Rapporter og BI</li><li>Stationsskærme</li><li>Multi-tenant og SLA</li></ul></article>
+        </div>
+
+        <div class="mapping-grid">
+          <section class="panel map-panel">
+            <div class="panel-heading"><div><span class="eyebrow">SYSTEMLANDSKAB</span><h2>Målarkitektur</h2></div></div>
+            <div class="architecture">
+              <div class="arch-source"><b>Alarmerkilder</b><span>Kontrolcentral</span><span>112/CAD</span><span>ABA / IoT</span></div>
+              <div class="arch-arrow">→</div>
+              <div class="arch-core"><b>Alarmplatform</b><span>API & regler</span><span>Alarmmotor</span><span>Auditlog</span><span>Organisationer</span></div>
+              <div class="arch-arrow">→</div>
+              <div class="arch-output"><b>Kanaler</b><span>iOS / Android</span><span>Web / PWA</span><span>SMS fallback</span><span>Stationsskærm</span></div>
+            </div>
+          </section>
+          <section class="panel decision-panel">
+            <div class="panel-heading"><div><span class="eyebrow">AFKLARINGER</span><h2>Beslutninger før fase 1</h2></div></div>
+            <ol class="decision-list">
+              <li><span>01</span><div><b>Første målgruppe</b><small>Brandværn, søredning, virksomhed eller tværgående beredskab?</small></div></li>
+              <li><span>02</span><div><b>App-teknologi</b><small>Flutter/React Native eller native iOS + Android.</small></div></li>
+              <li><span>03</span><div><b>Push og fallback</b><small>FCM/APNs direkte eller leverandør; hvornår bruges SMS/telefon?</small></div></li>
+              <li><span>04</span><div><b>Driftskrav</b><small>Oppetid, redundans, dataplacering, logging og beredskabsprocedure.</small></div></li>
+              <li><span>05</span><div><b>Integrationer</b><small>Hvilket CAD/alarmmodtagersystem skal være første kilde?</small></div></li>
+            </ol>
+          </section>
+        </div>
+
+        <section class="panel domain-panel">
+          <div class="panel-heading"><div><span class="eyebrow">DOMÆNEMODEL</span><h2>Kerneobjekter og ansvar</h2></div></div>
+          <div class="domain-grid">
+            <div><b>Organisation</b><small>Tenant, stationer, politikker</small></div><span>→</span>
+            <div><b>Bruger</b><small>Identitet, roller, kompetencer</small></div><span>→</span>
+            <div><b>Vagt / status</b><small>Tilgængelighed, enhed, position</small></div><span>→</span>
+            <div><b>Alarm</b><small>Type, prioritet, lokation, payload</small></div><span>→</span>
+            <div><b>Levering</b><small>Push, retry, fallback, kvittering</small></div><span>→</span>
+            <div><b>Hændelseslog</b><small>Uforanderlig audit og rapportering</small></div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js?v=2"></script>
+</body>
+</html>
