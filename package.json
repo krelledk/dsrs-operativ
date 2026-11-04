@@ -1,6 +1,6 @@
 {
   "name": "dsrs-operativ",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "Operativ SAR-alarmprototype til Dansk Søredningsselskab",
   "type": "module",

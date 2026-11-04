@@ -20,14 +20,14 @@ body{background-color:var(--bg);background-image:linear-gradient(rgba(65,122,153
 @media(max-width:1180px){.responder-layout{grid-template-columns:1fr}.phone-frame{margin:auto}.app-setup{width:min(100%,560px);margin:auto}}
 
 /* Installed DSRS SAR app */
-body.responder-app-mode{min-height:100dvh;overflow:hidden;background:#07131e;overscroll-behavior:none}
-body.responder-app-mode .shell{display:block;min-height:100dvh}
+body.responder-app-mode{width:100%;min-width:0;min-height:var(--app-height,100dvh);overflow:hidden;background:#07131e;overscroll-behavior:none}
+body.responder-app-mode .shell{display:block;width:100%;min-width:0;min-height:var(--app-height,100dvh)}
 body.responder-app-mode .sidebar,body.responder-app-mode .topbar,body.responder-app-mode .app-setup{display:none!important}
-body.responder-app-mode .shell>main{display:block;min-height:100dvh}
+body.responder-app-mode .shell>main{display:block;width:100%;min-width:0;min-height:var(--app-height,100dvh)}
 body.responder-app-mode .view{display:none!important}
-body.responder-app-mode #responder-view.active{display:block!important;max-width:none;min-height:100dvh;margin:0;padding:0}
-body.responder-app-mode .responder-layout{display:block;min-height:100dvh}
-body.responder-app-mode .phone-frame{width:100%;max-width:none;height:100dvh;min-height:0;margin:0;border:0;border-radius:0;background:#07131e;box-shadow:none}
+body.responder-app-mode #responder-view.active{display:block!important;width:100%;max-width:none;min-height:var(--app-height,100dvh);margin:0;padding:0}
+body.responder-app-mode .responder-layout{display:block;width:100%;min-height:var(--app-height,100dvh)}
+body.responder-app-mode .phone-frame{width:100%;max-width:none;height:var(--app-height,100dvh);min-height:0;margin:0;border:0;border-radius:0;background:#07131e;box-shadow:none}
 body.responder-app-mode .phone-status{height:calc(31px + env(safe-area-inset-top));padding:calc(8px + env(safe-area-inset-top)) 20px 0;flex:0 0 auto;color:#d7e2e9;font-size:10px}
 body.responder-app-mode .app-header{flex:0 0 auto;padding:10px 18px 14px;background:rgba(7,19,30,.96);backdrop-filter:blur(16px)}
 body.responder-app-mode .app-logo{font-size:14px}
@@ -40,6 +40,7 @@ body.responder-app-mode .mobile-alarm .alarm-kicker{font-size:10px}
 body.responder-app-mode .mobile-alarm h3{margin:12px 0 5px;font-size:27px;line-height:1.1}
 body.responder-app-mode .mobile-alarm .location{font-size:13px}
 body.responder-app-mode .mobile-alarm .message{font-size:12px;line-height:1.55}
+body.responder-app-mode .mobile-alarm .location,body.responder-app-mode .mobile-alarm .message{overflow-wrap:anywhere}
 body.responder-app-mode .mobile-alarm .units span{padding:5px 8px;font-size:9px}
 body.responder-app-mode .app-actions{gap:10px;margin:13px 0}
 body.responder-app-mode .app-actions button{min-height:76px;border-radius:12px;font-size:24px}
@@ -51,4 +52,6 @@ body.responder-app-mode .app-tabbar{position:absolute;height:calc(64px + env(saf
 body.responder-app-mode .app-tabbar span{font-size:19px}
 body.responder-app-mode .app-tabbar small{font-size:8px}
 body.responder-app-mode .toast{right:14px;bottom:calc(78px + env(safe-area-inset-bottom));left:14px;max-width:none;text-align:center}
+@media(max-width:360px){body.responder-app-mode .phone-status{padding-right:14px;padding-left:14px}body.responder-app-mode .app-header{padding-right:13px;padding-left:13px}body.responder-app-mode .app-body{padding-right:12px;padding-left:12px}body.responder-app-mode .mobile-alarm{padding:16px}body.responder-app-mode .mobile-alarm h3{font-size:23px}body.responder-app-mode .mobile-alarm .location{font-size:11px}body.responder-app-mode .mobile-alarm .message{font-size:11px}body.responder-app-mode .app-actions{gap:7px}body.responder-app-mode .app-actions button{min-height:68px;font-size:21px}body.responder-app-mode .app-card{padding:13px}}
+@media(max-height:700px){body.responder-app-mode .phone-status{height:calc(27px + env(safe-area-inset-top));padding-top:calc(6px + env(safe-area-inset-top))}body.responder-app-mode .app-header{padding-top:7px;padding-bottom:9px}body.responder-app-mode .app-logo .brand-mark{width:30px;height:30px}body.responder-app-mode .avatar{width:30px;height:30px}body.responder-app-mode .app-body{padding-top:11px}body.responder-app-mode .mobile-alarm{padding:15px}body.responder-app-mode .mobile-alarm h3{margin-top:8px;font-size:23px}body.responder-app-mode .mobile-alarm .message{padding-top:9px}body.responder-app-mode .app-actions button{min-height:62px}body.responder-app-mode .app-card{padding:12px}}
 @media(min-width:700px){body.responder-app-mode{background:#04101b}body.responder-app-mode .phone-frame{max-width:430px;margin:auto;box-shadow:0 30px 90px rgba(0,0,0,.55)}}

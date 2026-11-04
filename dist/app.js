@@ -94,6 +94,7 @@ async function respond(status){
 }
 
 function isResponderApp(){return isStandalone()||new URLSearchParams(location.search).has('app-preview')}
+function updateViewportMetrics(){const viewport=window.visualViewport;const width=Math.round(viewport?.width||window.innerWidth);const height=Math.round(viewport?.height||window.innerHeight);document.documentElement.style.setProperty('--app-width',`${width}px`);document.documentElement.style.setProperty('--app-height',`${height}px`)}
 function updateMobileIdentity(){const name=localStorage.getItem(DEVICE.name)||'Maja Andersen';const initials=name.split(/\s+/).filter(Boolean).map(part=>part[0]).join('').slice(0,2).toUpperCase()||'DS';const avatar=document.querySelector('#mobile-avatar');avatar.textContent=initials;avatar.setAttribute('aria-label',`Registreret som ${name}`);avatar.title=name}
 function navigate(){
   const name=(location.hash.split('?')[0]||'#control').slice(1); const requested=['control','responder','roadmap'].includes(name)?name:'control';const view=isResponderApp()?'responder':requested;
@@ -177,8 +178,11 @@ async function installApp(){
 
 function updateRecipients(){const values=[...document.querySelectorAll('.unit-picker input:checked')].map(x=>x.value);let count=values.includes('Hele stationen')?8:values.reduce((n,v)=>n+(v==='RS Køge'?4:v==='RHIB 01'?2:1),0);document.querySelector('#recipient-count').textContent=count}
 
-ensureSeed();renderAlarm();renderLog();navigate();
+updateViewportMetrics();ensureSeed();renderAlarm();renderLog();navigate();
 window.addEventListener('hashchange',navigate);
+window.addEventListener('resize',updateViewportMetrics,{passive:true});
+window.addEventListener('orientationchange',updateViewportMetrics,{passive:true});
+window.visualViewport?.addEventListener('resize',updateViewportMetrics,{passive:true});
 window.addEventListener('storage',e=>{if(Object.values(STORAGE).includes(e.key)){renderAlarm();renderLog();if(e.key===STORAGE.current)receiveAlarm(currentAlarm())}});
 channel?.addEventListener('message',e=>{if(e.data.type==='alarm')receiveAlarm(e.data.alarm);if(e.data.type==='response'){renderAlarm();renderLog();showToast(`${e.data.name} har kvitteret.`)}if(e.data.type==='delivery'){renderAlarm();renderLog()}});
 document.querySelector('#alarm-form').addEventListener('submit',sendAlarm);
