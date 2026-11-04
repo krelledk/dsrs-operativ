@@ -1,0 +1,16 @@
+{
+  "name": "dsrs/sar-pilot-backend",
+  "description": "DSRS SAR pilotbackend til Web Push og kvitteringer",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": ">=8.2",
+    "minishlink/web-push": "^11.0"
+  },
+  "config": {
+    "allow-plugins": {
+      "php-http/discovery": true
+    },
+    "sort-packages": true
+  }
+}

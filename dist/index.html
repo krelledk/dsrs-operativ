@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
   <div class="shell">
@@ -204,7 +204,7 @@
             <button id="install-button" class="secondary-button">Installer DSRS SAR</button>
             <p id="install-status" class="install-status" aria-live="polite"></p>
             <button id="new-tab-button" class="secondary-button">Åbn app i ny fane</button>
-            <div class="scope-note"><b>DSRS · MVP</b><p>Produktionsadressen bliver <strong>alarm.hansenlabs.dk</strong>. Prototypen validerer det operative SAR-flow; ægte alarmtransport kræver backend, brugerlogin, APNs/FCM og dokumenteret fallback.</p></div>
+            <div class="scope-note"><b>DSRS · PUSH-PILOT</b><p>Telefonen registreres til krypteret Web Push. Pilotadgang sker med stationskode; senere erstattes den af DSRS-login og dokumenteret SMS/telefon-fallback.</p></div>
           </aside>
         </div>
       </section>
@@ -271,6 +271,27 @@
       <button class="primary-button" value="close">Forstået</button>
     </form>
   </dialog>
-  <script src="app.js?v=5"></script>
+  <dialog id="admin-dialog" class="install-dialog" aria-labelledby="admin-dialog-title">
+    <form method="dialog" id="admin-form">
+      <button class="dialog-close" value="close" aria-label="Luk">×</button>
+      <span class="eyebrow">SIKKER KONTROLCENTRAL</span>
+      <h2 id="admin-dialog-title">Log ind før alarmudsendelse</h2>
+      <label>Kontrolcentral-kode<input id="admin-code" type="password" required minlength="8" autocomplete="current-password"></label>
+      <button class="primary-button" type="submit">Log ind og fortsæt</button>
+    </form>
+  </dialog>
+  <dialog id="device-dialog" class="install-dialog" aria-labelledby="device-dialog-title">
+    <form id="device-form">
+      <button class="dialog-close" id="device-dialog-close" type="button" aria-label="Luk">×</button>
+      <span class="eyebrow">REGISTRER BESÆTNING</span>
+      <h2 id="device-dialog-title">Tilknyt denne telefon</h2>
+      <p class="dialog-copy">Navnet vises i kontrolcentralens kvitteringsliste.</p>
+      <label>Navn<input id="crew-name" required maxlength="80" autocomplete="name" value="Maja Andersen"></label>
+      <label>Stationskode<input id="station-code" type="password" required minlength="8" autocomplete="one-time-code"></label>
+      <p id="device-status" class="device-status" role="status" aria-live="polite">Tryk på knappen, og godkend derefter telefonens spørgsmål om notifikationer.</p>
+      <button class="primary-button" type="submit">Registrer og aktivér push</button>
+    </form>
+  </dialog>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
