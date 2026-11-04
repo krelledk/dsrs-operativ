@@ -1,7 +1,7 @@
 {
-  "name": "Alarmberedskab",
-  "short_name": "Alarm",
-  "description": "Modtag og kvittér beredskabsalarmer.",
+  "name": "DSRS Operativ",
+  "short_name": "DSRS SAR",
+  "description": "Modtag og kvittér SAR-alarmer fra Dansk Søredningsselskab.",
   "start_url": "./#responder",
   "display": "standalone",
   "background_color": "#07101a",

@@ -1,10 +1,10 @@
-const STORAGE = { alarms: 'ab.alarms.v1', current: 'ab.current.v1', responses: 'ab.responses.v1', delivery: 'ab.delivery.v1', logs: 'ab.logs.v1' };
+const STORAGE = { alarms: 'dsrs.alarms.v2', current: 'dsrs.current.v2', responses: 'dsrs.responses.v2', delivery: 'dsrs.delivery.v2', logs: 'dsrs.logs.v2' };
 const channel = 'BroadcastChannel' in window ? new BroadcastChannel('alarmberedskab') : null;
 const crew = [
-  ['MA','Maja Andersen','Røgdykker','accepted'],['JL','Jonas Lund','Holdleder','wait'],['SK','Sara Kjær','Chauffør','accepted'],['MN','Mikkel Nielsen','Røgdykker','accepted'],
-  ['EF','Emil Friis','Brandmand','accepted'],['LH','Line Holm','Brandmand','wait'],['TB','Thomas Bruun','Brandmand','accepted'],['AP','Anna Poulsen','Brandmand','rejected']
+  ['MA','Maja Andersen','Skipper','accepted'],['JL','Jonas Lund','Navigatør','wait'],['SK','Sara Kjær','Bådfører','accepted'],['MN','Mikkel Nielsen','Søredder','accepted'],
+  ['EF','Emil Friis','Søredder','accepted'],['LH','Line Holm','Maskinansvarlig','wait'],['TB','Thomas Bruun','Søredder','accepted'],['AP','Anna Poulsen','Søredder','rejected']
 ];
-const seedAlarm = {id:'demo-001',type:'Bygningsbrand',priority:'critical',location:'Havnevej 14, 4600 Køge',message:'Røg fra tagkonstruktion. Personer meldes ude. Indsatsleder på vej.',units:['Hold 1','Tankvogn'],createdAt:new Date(Date.now()-240000).toISOString()};
+const seedAlarm = {id:'demo-001',type:'Fartøj i nød',priority:'high',location:"55°27.90'N · 12°12.45'E · Køge Bugt",message:'Sejlbåd med motorstop og drivende mod sydøst. 3 personer ombord, alle bærer redningsvest. Vind 8 m/s V.',units:['RS Køge','RHIB 01'],createdAt:new Date(Date.now()-240000).toISOString()};
 let deferredPrompt;
 
 function read(key, fallback){ try{return JSON.parse(localStorage.getItem(key)) ?? fallback}catch{return fallback} }
@@ -46,7 +46,7 @@ function renderDelivery(){
 
 function notify(alarm){
   if(!('Notification'in window)||Notification.permission!=='granted')return false;
-  const title=`ALARM · ${alarm.type}`; const options={body:`${alarm.location}\n${alarm.message}`,icon:'icon.svg',badge:'icon.svg',tag:alarm.id,renotify:true,data:{url:location.origin+location.pathname+'#responder'}};
+  const title=`DSRS SAR-ALARM · ${alarm.type}`; const options={body:`${alarm.location}\n${alarm.message}`,icon:'icon.svg',badge:'icon.svg',tag:alarm.id,renotify:true,data:{url:location.origin+location.pathname+'#responder'}};
   if(navigator.serviceWorker?.controller)navigator.serviceWorker.controller.postMessage({type:'SHOW_ALARM',title,options});
   else new Notification(title,options);
   return true;
@@ -79,7 +79,7 @@ function navigate(){
   const name=(location.hash||'#control').slice(1); const view=['control','responder','roadmap'].includes(name)?name:'control';
   document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.dataset.view===view));
   document.querySelectorAll('[data-view-link]').forEach(x=>x.classList.toggle('active',x.dataset.viewLink===view));
-  document.querySelector('#page-title').textContent={control:'Kontrolcentral',responder:'Mandskabsapp',roadmap:'Projektmapping'}[view];document.querySelector('.sidebar').classList.remove('open');
+  document.querySelector('#page-title').textContent={control:'SAR kontrolcentral',responder:'Besætningsapp',roadmap:'Udviklingsplan'}[view];document.querySelector('.sidebar').classList.remove('open');
 }
 
 async function enableNotifications(){
@@ -89,7 +89,7 @@ async function enableNotifications(){
   else showToast('Notifikationer blev ikke tilladt.',true)
 }
 
-function updateRecipients(){const values=[...document.querySelectorAll('.unit-picker input:checked')].map(x=>x.value);let count=values.includes('Alle')?16:values.reduce((n,v)=>n+(v==='Hold 1'?6:v==='Tankvogn'?2:1),0);document.querySelector('#recipient-count').textContent=count}
+function updateRecipients(){const values=[...document.querySelectorAll('.unit-picker input:checked')].map(x=>x.value);let count=values.includes('Hele stationen')?8:values.reduce((n,v)=>n+(v==='RS Køge'?4:v==='RHIB 01'?2:1),0);document.querySelector('#recipient-count').textContent=count}
 
 ensureSeed();renderAlarm();renderLog();navigate();
 window.addEventListener('hashchange',navigate);

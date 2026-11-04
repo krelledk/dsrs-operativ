@@ -1,0 +1,20 @@
+# Secrets and credentials
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example
+
+# Local tooling and generated packages
+node_modules/
+*.tar.gz
+*.zip
+.DS_Store
+Thumbs.db
+
+# Runtime data
+.wrangler/
+.dev.vars
+coverage/
