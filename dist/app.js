@@ -93,11 +93,14 @@ async function respond(status){
   const alarm=currentAlarm();if(alarm.deliveryToken)try{await api('receipt',{method:'POST',body:{deliveryToken:alarm.deliveryToken,stage:'response',response:status}})}catch(error){showToast(`Svaret kunne ikke sendes: ${error.message}`,true)}
 }
 
+function isResponderApp(){return isStandalone()||new URLSearchParams(location.search).has('app-preview')}
+function updateMobileIdentity(){const name=localStorage.getItem(DEVICE.name)||'Maja Andersen';const initials=name.split(/\s+/).filter(Boolean).map(part=>part[0]).join('').slice(0,2).toUpperCase()||'DS';const avatar=document.querySelector('#mobile-avatar');avatar.textContent=initials;avatar.setAttribute('aria-label',`Registreret som ${name}`);avatar.title=name}
 function navigate(){
-  const name=(location.hash.split('?')[0]||'#control').slice(1); const view=['control','responder','roadmap'].includes(name)?name:'control';
+  const name=(location.hash.split('?')[0]||'#control').slice(1); const requested=['control','responder','roadmap'].includes(name)?name:'control';const view=isResponderApp()?'responder':requested;
+  document.body.classList.toggle('responder-app-mode',isResponderApp()&&view==='responder');
   document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.dataset.view===view));
   document.querySelectorAll('[data-view-link]').forEach(x=>x.classList.toggle('active',x.dataset.viewLink===view));
-  document.querySelector('#page-title').textContent={control:'SAR kontrolcentral',responder:'Besætningsapp',roadmap:'Udviklingsplan'}[view];document.querySelector('.sidebar').classList.remove('open');
+  document.querySelector('#page-title').textContent={control:'SAR kontrolcentral',responder:'Besætningsapp',roadmap:'Udviklingsplan'}[view];document.querySelector('.sidebar').classList.remove('open');updateMobileIdentity();
 }
 
 async function enableNotifications(){
@@ -127,7 +130,7 @@ async function registerDevice(crewName,stationCode){
   setDeviceStatus('Registrerer telefonen hos DSRS SAR …','working');
   let deviceId=localStorage.getItem(DEVICE.id);if(!deviceId){deviceId=crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`;localStorage.setItem(DEVICE.id,deviceId)}
   const result=await withTimeout(api('subscribe',{method:'POST',body:{stationCode,crewName,deviceId,subscription:subscription.toJSON()}}),15000,'DSRS-serveren svarede ikke. Kontrollér internetforbindelsen, og prøv igen.');
-  localStorage.setItem(DEVICE.token,result.deviceToken);localStorage.setItem(DEVICE.name,result.crewName);document.querySelector('#notification-button').textContent='Pushnotifikationer aktiveret';setDeviceStatus('Telefonen er registreret, og pushnotifikationer er aktiveret.','success');showToast('Denne telefon er registreret til DSRS SAR.');await loadCurrentAlarm()
+  localStorage.setItem(DEVICE.token,result.deviceToken);localStorage.setItem(DEVICE.name,result.crewName);updateMobileIdentity();document.querySelector('#notification-button').textContent='Pushnotifikationer aktiveret';setDeviceStatus('Telefonen er registreret, og pushnotifikationer er aktiveret.','success');showToast('Denne telefon er registreret til DSRS SAR.');await loadCurrentAlarm()
 }
 async function loadCurrentAlarm(){const token=localStorage.getItem(DEVICE.token);if(!token||!backendOnline)return;try{const result=await api('current',{token});if(result.alarm){write(STORAGE.current,result.alarm);write(STORAGE.delivery,{alarmId:result.alarm.id,createdAt:result.alarm.createdAt,pushSentAt:result.delivery?.pushSentAt,appReceivedAt:result.delivery?.appReceivedAt,notificationShownAt:result.delivery?.notificationShownAt});renderAlarm()}}catch(error){if(/token/i.test(error.message)){localStorage.removeItem(DEVICE.token);document.querySelector('#notification-button').textContent='Aktivér pushnotifikationer'}}}
 async function pollRemoteStatus(){if(!backendOnline||!csrfToken)return;try{const result=await api('status');if(result.alarm){write(STORAGE.current,result.alarm);remoteDeliveries=result.deliveries;const first=key=>result.deliveries.map(item=>item[key]).filter(Boolean).sort()[0]||null;write(STORAGE.delivery,{alarmId:result.alarm.id,createdAt:result.alarm.createdAt,pushSentAt:first('push_sent_at'),appReceivedAt:first('app_received_at'),notificationShownAt:first('notification_shown_at')});renderAlarm()}}catch(error){if(/login/i.test(error.message))csrfToken=null}}
@@ -190,7 +193,8 @@ document.querySelector('#admin-form').addEventListener('submit',async event=>{ev
 document.querySelector('#device-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter||event.currentTarget.querySelector('[type="submit"]');const originalLabel=button.textContent;button.disabled=true;button.textContent='Aktiverer push …';try{await registerDevice(document.querySelector('#crew-name').value.trim(),document.querySelector('#station-code').value);document.querySelector('#station-code').value='';setTimeout(()=>document.querySelector('#device-dialog').close(),900)}catch(error){const message=error?.message||'Telefonen kunne ikke registreres.';setDeviceStatus(message,'error');showToast(message,true)}finally{button.disabled=false;button.textContent=originalLabel}});
 document.querySelector('#device-dialog-close').addEventListener('click',()=>document.querySelector('#device-dialog').close());
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'&&location.hash!=='#responder')document.querySelector('#alarm-form').requestSubmit()});
-setInterval(()=>document.querySelector('#clock').textContent=new Intl.DateTimeFormat('da-DK',{hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date()),1000);
+function updateClocks(){const now=new Date();document.querySelector('#clock').textContent=new Intl.DateTimeFormat('da-DK',{hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(now);document.querySelector('#mobile-clock').textContent=new Intl.DateTimeFormat('da-DK',{hour:'2-digit',minute:'2-digit'}).format(now)}
+updateClocks();setInterval(updateClocks,1000);
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;updateInstallUI()});
 window.addEventListener('appinstalled',()=>{deferredPrompt=null;updateInstallUI();showToast('DSRS SAR er installeret.')});
 document.querySelector('#install-button').addEventListener('click',installApp);

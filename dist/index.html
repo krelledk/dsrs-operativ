@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
   <div class="shell">
@@ -166,10 +166,10 @@
       <section class="view" id="responder-view" data-view="responder">
         <div class="responder-layout">
           <section class="phone-frame" aria-label="Mobilapp-preview">
-            <div class="phone-status"><span>09:41</span><span>● ◔ ▰</span></div>
+            <div class="phone-status"><span id="mobile-clock">09:41</span><span aria-hidden="true">● ◔ ▰</span></div>
           <div class="app-header">
               <div class="app-logo"><span class="brand-mark mini"><span></span></span><b>DSRS Operativ</b></div>
-              <span class="avatar">MA</span>
+              <span class="avatar" id="mobile-avatar" aria-label="Registreret besætning">MA</span>
             </div>
             <div class="app-body">
               <div class="app-state"><span class="status-dot online"></span> Station Køge · Du er i beredskab</div>
@@ -292,6 +292,6 @@
       <button class="primary-button" type="submit">Registrer og aktivér push</button>
     </form>
   </dialog>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
