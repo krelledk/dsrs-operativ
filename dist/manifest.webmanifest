@@ -2,10 +2,27 @@
   "name": "DSRS Operativ",
   "short_name": "DSRS SAR",
   "description": "Modtag og kvittér SAR-alarmer fra Dansk Søredningsselskab.",
-  "start_url": "./#responder",
+  "id": "/dsrs-sar",
+  "start_url": "/#responder",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#07101a",
   "theme_color": "#08121e",
   "lang": "da-DK",
-  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+  "categories": ["navigation", "utilities"],
+  "prefer_related_applications": false,
+  "icons": [
+    {"src":"icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"icon-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+  ],
+  "shortcuts": [
+    {
+      "name": "Aktiv SAR-alarm",
+      "short_name": "SAR-alarm",
+      "url": "/#responder",
+      "icons": [{"src":"icon-192.png","sizes":"192x192","type":"image/png"}]
+    }
+  ]
 }

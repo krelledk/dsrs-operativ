@@ -5,10 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#08121e">
   <meta name="description" content="DSRS operativ platform til alarmering og koordinering af frivillige søreddere.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DSRS SAR">
   <title>DSRS Operativ</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
   <div class="shell">
@@ -190,12 +196,13 @@
             <h2>Fra alarm til afgang — uden tvivl</h2>
             <p>Åbn SAR-centralen og appen i hver sin fane. Besætningen modtager position, situationsmelding og enheder og kvitterer direkte til stationen.</p>
             <div class="setup-steps">
-              <div><span>1</span><p><b>Tillad notifikationer</b><small>Browseren kræver dit aktive samtykke.</small></p></div>
-              <div><span>2</span><p><b>Åbn som separat fane</b><small>Simulerer den mobile modtagers app.</small></p></div>
+              <div><span>1</span><p><b>Installer DSRS SAR</b><small>Føj appen til hjemmeskærmen på Android eller iPhone.</small></p></div>
+              <div><span>2</span><p><b>Tillad notifikationer</b><small>Giv samtykke fra den installerede app.</small></p></div>
               <div><span>3</span><p><b>Send og kvittér</b><small>Modtaget, notifikation vist og dit svar vises live i kontrolcentralen.</small></p></div>
             </div>
             <button id="notification-button" class="primary-button">Aktivér pushnotifikationer</button>
-            <button id="install-button" class="secondary-button" hidden>Installer app</button>
+            <button id="install-button" class="secondary-button">Installer DSRS SAR</button>
+            <p id="install-status" class="install-status" aria-live="polite"></p>
             <button id="new-tab-button" class="secondary-button">Åbn app i ny fane</button>
             <div class="scope-note"><b>DSRS · MVP</b><p>Produktionsadressen bliver <strong>alarm.hansenlabs.dk</strong>. Prototypen validerer det operative SAR-flow; ægte alarmtransport kræver backend, brugerlogin, APNs/FCM og dokumenteret fallback.</p></div>
           </aside>
@@ -254,6 +261,16 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=4"></script>
+  <dialog id="install-dialog" class="install-dialog" aria-labelledby="install-dialog-title">
+    <form method="dialog">
+      <button class="dialog-close" value="close" aria-label="Luk">×</button>
+      <span class="brand-mark" aria-hidden="true"><span></span></span>
+      <span class="eyebrow">INSTALLER DSRS SAR</span>
+      <h2 id="install-dialog-title">Føj appen til din hjemmeskærm</h2>
+      <div id="install-instructions" class="install-instructions"></div>
+      <button class="primary-button" value="close">Forstået</button>
+    </form>
+  </dialog>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

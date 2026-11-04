@@ -46,7 +46,7 @@ function renderDelivery(){
 
 function notify(alarm){
   if(!('Notification'in window)||Notification.permission!=='granted')return false;
-  const title=`DSRS SAR-ALARM · ${alarm.type}`; const options={body:`${alarm.location}\n${alarm.message}`,icon:'icon.svg',badge:'icon.svg',tag:alarm.id,renotify:true,data:{url:location.origin+location.pathname+'#responder'}};
+  const title=`DSRS SAR-ALARM · ${alarm.type}`; const options={body:`${alarm.location}\n${alarm.message}`,icon:'icon-192.png',badge:'icon-192.png',tag:alarm.id,renotify:true,data:{url:location.origin+location.pathname+'#responder'}};
   if(navigator.serviceWorker?.controller)navigator.serviceWorker.controller.postMessage({type:'SHOW_ALARM',title,options});
   else new Notification(title,options);
   return true;
@@ -89,6 +89,45 @@ async function enableNotifications(){
   else showToast('Notifikationer blev ikke tilladt.',true)
 }
 
+function isStandalone(){return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true}
+function isIOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent)}
+
+function updateInstallUI(){
+  const button=document.querySelector('#install-button');
+  const status=document.querySelector('#install-status');
+  if(isStandalone()){
+    button.hidden=true;
+    status.textContent='✓ DSRS SAR er installeret på denne enhed.';
+    status.classList.add('installed');
+    return;
+  }
+  button.hidden=false;
+  status.classList.remove('installed');
+  status.textContent=isIOS()?'iPhone/iPad: Installer via Del-menuen.':'Installer appen for hurtig adgang fra hjemmeskærmen.';
+}
+
+function showInstallInstructions(){
+  const dialog=document.querySelector('#install-dialog');
+  const instructions=document.querySelector('#install-instructions');
+  if(isIOS())instructions.innerHTML='<ol><li>Åbn siden i <b>Safari</b>.</li><li>Tryk på <b>Del</b>-ikonet.</li><li>Vælg <b>Føj til hjemmeskærm</b>.</li><li>Åbn derefter DSRS SAR fra hjemmeskærmen.</li></ol>';
+  else instructions.innerHTML='<ol><li>Åbn browserens menu.</li><li>Vælg <b>Installer app</b> eller <b>Føj til startskærm</b>.</li><li>Bekræft installationen.</li></ol>';
+  if(typeof dialog.showModal==='function')dialog.showModal();
+  else showToast(instructions.textContent);
+}
+
+async function installApp(){
+  if(!window.isSecureContext){showToast('Installation kræver en sikker HTTPS-forbindelse.',true);return}
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const {outcome}=await deferredPrompt.userChoice;
+    deferredPrompt=null;
+    if(outcome==='accepted')showToast('DSRS SAR installeres nu.');
+    updateInstallUI();
+    return;
+  }
+  showInstallInstructions();
+}
+
 function updateRecipients(){const values=[...document.querySelectorAll('.unit-picker input:checked')].map(x=>x.value);let count=values.includes('Hele stationen')?8:values.reduce((n,v)=>n+(v==='RS Køge'?4:v==='RHIB 01'?2:1),0);document.querySelector('#recipient-count').textContent=count}
 
 ensureSeed();renderAlarm();renderLog();navigate();
@@ -105,6 +144,10 @@ document.querySelector('.menu-button').addEventListener('click',()=>document.que
 document.querySelector('#clear-demo').addEventListener('click',()=>{Object.values(STORAGE).forEach(k=>localStorage.removeItem(k));ensureSeed();renderAlarm();renderLog();showToast('Demoen er nulstillet.')});
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'&&location.hash!=='#responder')document.querySelector('#alarm-form').requestSubmit()});
 setInterval(()=>document.querySelector('#clock').textContent=new Intl.DateTimeFormat('da-DK',{hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date()),1000);
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.querySelector('#install-button').hidden=false});
-document.querySelector('#install-button').addEventListener('click',async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;document.querySelector('#install-button').hidden=true});
-if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;updateInstallUI()});
+window.addEventListener('appinstalled',()=>{deferredPrompt=null;updateInstallUI();showToast('DSRS SAR er installeret.')});
+document.querySelector('#install-button').addEventListener('click',installApp);
+updateInstallUI();
+if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js',{scope:'./'}).then(registration=>{
+  if(registration.waiting)registration.waiting.postMessage({type:'SKIP_WAITING'});
+}).catch(()=>showToast('Appens offline-funktion kunne ikke startes.',true));
