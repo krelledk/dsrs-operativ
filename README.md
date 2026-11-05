@@ -7,6 +7,8 @@ En buildless pilot til Dansk Søredningsselskab med kontrolcentral, installerbar
 - Aktiv alarm kan afsluttes fra kontrolcentralen; den fjernes derefter automatisk i registrerede apps.
 - Projektmapping fra prototype til robust, integreret alarmplatform.
 
+Det færdige produkt har et bindende skaleringskrav på mindst 14 aktive stationer, flere fartøjer pr. station, samtidige hændelser og tværgående nabostationsindsats. Den nuværende MVP er fortsat en enkeltstationspilot; produktionsdatamodellen skal fjerne alle antagelser om én station, ét fartøj eller én global aktiv alarm.
+
 ## Pilotens tekniske afgrænsning
 
 Fjern-push, enhedsregistrering og kvitteringer kører via pilotbackenden på Simply. `localStorage` og `BroadcastChannel` bevares som lokal demo/fallback. Løsningen er fortsat en pilot og må ikke stå alene som operativ alarmeringskanal, før redundans, overvågning, adgangsstyring og SMS/telefon-fallback er etableret.

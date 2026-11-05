@@ -4,6 +4,8 @@
 **Dato:** 5. november 2026  
 **Status:** Strategisk arbejdsgrundlag; tidsestimater skal valideres efter pilotstation, integrationer og driftskrav er afklaret.
 
+**Skaleringskrav:** Platformen skal fra datamodellens første produktionsversion understøtte mindst 14 aktive redningsstationer, flere fartøjer pr. station og tværgående indsættelser. Tallet 14 er et minimum og må ikke implementeres som en teknisk øvre grænse.
+
 ## 1. Konklusion
 
 DSRS bør ikke bygge en dansk kopi af et brandvæsenssystem. Produktet bør kombinere de bedste mønstre fra FireServiceRota og Alarm Dispatcher med et maritimt operationslag, der er bygget omkring fartøjer, farvand, kvalificeret minimumsbesætning, vejr, tidevand, position og samarbejde med JRCC.
@@ -16,6 +18,19 @@ Produktet bør organiseres omkring fire sammenhængende operative kredsløb:
 4. **Afslutning og læring:** Hvem afslutter, hvad blev gjort, og hvordan dokumenteres indsatsen, materiellet og læringen?
 
 Det vigtigste produktvalg er at gøre **pålidelig alarmering og bemandingsbeslutning** fejlsikker før der bygges bred HR-, løn- eller administrationsfunktionalitet. En operatør skal på få sekunder kunne se, om alarmkæden virker, om en kvalificeret besætning er på vej, og hvilken eskalation der er nødvendig.
+
+### 1.1 Ikke-forhandlingsbart skaleringsprincip
+
+- **Én fælles DSRS-platform:** Stationerne er organisatoriske enheder i samme system, ikke 14 separate installationer.
+- **Ingen hardkodning:** Station, fartøj, alarmgruppe, rolle, mødested og operationsområde er konfigurerbare data med stabile ID'er.
+- **Flere fartøjer pr. station:** Hvert fartøj har egen type, kaldesignal, hjemme-/aktuel station, status, minimumsbesætning, kompetencekrav og materielprofil.
+- **Mange-til-mange:** En person kan være tilknyttet flere stationer og roller; et fartøj kan midlertidigt flyttes eller udlånes; en hændelse kan involvere flere stationer og fartøjer.
+- **Lokal og central adgang:** Stationer ser som udgangspunkt egne data, mens autoriserede centrale roller kan se og koordinere på tværs.
+- **Politikarv:** DSRS kan definere fælles regler, som en station kun kan afvige fra, hvor det udtrykkeligt er tilladt og auditeret.
+- **Tværgående eskalation:** En alarm kan eskalere til nabostationer ud fra operationsområde, fartøjstype, kompetencemangel, afstand og forventet afgang.
+- **Samtidige hændelser:** Systemet skal håndtere flere aktive alarmer på forskellige stationer uden at overskrive eller sammenblande data.
+
+Den nuværende MVP er bevidst en enkeltstationspilot. Den må ikke betragtes som klar til netværksdrift, før ovenstående er implementeret og belastningstestet.
 
 ## 2. Researchmetode og afgrænsning
 
@@ -189,6 +204,7 @@ Tidsangivelserne er retningsgivende fra godkendt start med et lille fokuseret pr
 **Mål:** En driftbar pilot, hvor alarmkæden og ansvaret er entydigt.
 
 - Rigtig identitet, MFA for operatører, roller og stationsadskillelse.
+- Produktionsdatamodel med organisation, station, fartøj, medlemskaber og samtidige hændelser — dimensioneret til 14+ stationer fra start.
 - Serverbaseret alarmmotor, idempotente hændelser, robust database og audit.
 - Native push via FCM/APNs; iOS Critical Alerts kræver særskilt Apple-godkendelse.
 - Leveringsdiagnostik pr. telefon og klar operatørstatus: sendt, modtaget, vist, svar, offline/ukendt.
@@ -199,6 +215,8 @@ Tidsangivelserne er retningsgivende fra godkendt start med et lille fokuseret pr
 - Monitoring, backup, incident response, databehandleraftaler og pilot-support.
 
 **Gate:** Pilotstationen kan gennemføre alarm, bemanding, eskalation og afslutning uden parallel manuel liste; fallback er øvet.
+
+**Arkitekturgate:** Ingen produktionskode må længere antage `koege`, ét fartøj eller én global aktiv alarm. Alle forespørgsler og hændelser skal være scoped med organisation/station og entydigt alarm-ID.
 
 ### Fase 2 — Beredskab og besætningsplan (3–6 måneder)
 
@@ -211,6 +229,7 @@ Tidsangivelserne er retningsgivende fra godkendt start med et lille fokuseret pr
 - Fartøjs- og kritisk materielstatus.
 - Stationsdisplay, tale og lokale lyd-/lysrelæer som særskilte kanaler.
 - Multi-station og nabostationseskalation.
+- Fælles ressourcemap med hjemme-/aktuel station og mulighed for midlertidigt udlånte fartøjer.
 
 **Gate:** Systemet kan advare om et fremtidigt beredskabshul og forklare præcis hvilken rolle/kompetence der mangler.
 
@@ -230,7 +249,7 @@ Tidsangivelserne er retningsgivende fra godkendt start med et lille fokuseret pr
 
 ### Fase 4 — Organisationsplatform (9–15 måneder)
 
-**Mål:** Skalér fra pilot til DSRS-netværk uden at miste lokal fleksibilitet.
+**Mål:** Aktivér fuld netværksdrift på mindst 14 stationer uden at miste lokal fleksibilitet.
 
 - Hierarki: DSRS → region/område → station → fartøj → hold/person.
 - Central politik med lokale undtagelser.
@@ -240,7 +259,7 @@ Tidsangivelserne er retningsgivende fra godkendt start med et lille fokuseret pr
 - Rapporter, BI, statistik, fairness og kapacitetsplanlægning.
 - Standardiseret onboarding, support og datamigrering.
 
-**Gate:** Flere stationer kan driftes med samme platform, adskilte rettigheder og sammenlignelige data.
+**Gate:** Mindst 14 stationer og deres fartøjer kan driftes med samme platform, adskilte rettigheder, sammenlignelige data og samtidige hændelser.
 
 ### Fase 5 — Robusthed, sikkerhed og certificering (overlapper 6–18 måneder)
 
@@ -366,9 +385,10 @@ Når alarmen afsluttes, fjernes den aktive alarmflade og erstattes af: **“Alar
 
 Kerneobjekter bør mindst være:
 
-- Organisation, område, station og operationsområde.
-- Fartøj/enhed, status, minimumsbesætning og kritisk materiel.
+- Organisation, område, station, naborelation og operationsområde.
+- Fartøj/enhed, hjemme-/aktuel station, status, minimumsbesætning og kritisk materiel.
 - Person, rolle, kompetence, certifikat, stationstilknytning og privatlivssamtykke.
+- Medlemskab mellem person og station med lokale roller, alarmeringsgrupper og gyldighedsperiode.
 - Tilgængelighedsinterval, vagt, ferie og kalenderhændelse.
 - Alarm/hændelse med ekstern reference, version, prioritet, maritim position og koordinerende myndighed.
 - Opgave/tasking med fartøj, roller og mødested/launch point.
@@ -378,6 +398,19 @@ Kerneobjekter bør mindst være:
 - Operativ tidslinje, kommunikationslog og vedhæftning.
 - Afslutning, fartøjs-genmelding, rapport, debrief og action item.
 - Uforanderlig audit event med actor, tidspunkt, før/efter og korrelations-ID.
+
+Alle domæneobjekter skal have stabile, ikke-betydningsbærende ID'er. Stationsnavn og fartøjsnavn må ændres uden at bryde historik eller integrationer.
+
+### 11.1 Kapacitets- og isolationstest
+
+Før netværksdrift skal testmiljøet mindst simulere:
+
+- 20 stationer, så designet har margin over det kendte krav på 14+.
+- 5 fartøjer pr. station og forskellige minimumsbemandingsprofiler.
+- 1.000 registrerede enheder og samtidige push-/fallbackforsøg.
+- Flere samtidige alarmer med overlappende stationer, personer og fartøjer.
+- En nabostation, der overtager eller supplerer en hændelse.
+- At en stationsbruger aldrig kan læse eller ændre en anden stations data uden tildelt tværgående rolle.
 
 ## 12. Build-versus-buy
 
