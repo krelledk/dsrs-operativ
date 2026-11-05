@@ -18,10 +18,11 @@ Senest kontrolleret: 5. november 2026.
 - Network-first navigation og versionsstyret app-shell-cache.
 - Krypteret standardsbaseret Web Push med leveringskvitteringer.
 - Systemlyd anmodes med `silent: false`; kompatible Android-enheder får vibrationsmønster.
-- Gentaget SAR-tone i forgrunden via Web Audio API.
+- Gentaget SAR-tone i forgrunden via en genereret WAV/HTML-audiofil med Web Audio som fallback.
 - Lydtest i appen klargør browserens lydkontekst efter en brugerhandling.
 - Fallback-polling hvert 15. sekund, når appen er åben.
 - Alarmlyd og vibration stoppes ved Accepteret/Ej accepteret.
+- Kontrolcentralen kan afslutte den aktive alarm; åbne apps rydder den straks eller ved næste 15-sekunders synkronisering, og lukkede apps rydder den ved næste åbning.
 
 ## Platformbegrænsninger
 

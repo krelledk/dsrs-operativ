@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=12">
+  <link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
   <div class="shell">
@@ -134,7 +134,10 @@
           <section class="panel response-panel">
             <div class="panel-heading">
               <div><span class="eyebrow">SENESTE SAR-ALARM</span><h2>Position & kvitteringer</h2></div>
-              <span class="live-badge"><span></span> LIVE</span>
+              <div class="alarm-heading-actions">
+                <span class="live-badge"><span></span> LIVE</span>
+                <button class="complete-alarm-button" id="complete-alarm-button" type="button">Afslut alarm</button>
+              </div>
             </div>
             <div id="latest-alarm-summary" class="alarm-summary"></div>
             <div class="sea-chart" aria-label="Søkort over alarmpositionen">
@@ -299,6 +302,6 @@
       <button class="primary-button" type="submit">Registrer og aktivér push</button>
     </form>
   </dialog>
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>

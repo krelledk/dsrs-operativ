@@ -40,11 +40,11 @@ $method = (string) $_SERVER['REQUEST_METHOD'];
 
 try {
     if ($action === 'health' && $method === 'GET') {
-        respond(['ok' => true, 'service' => 'DSRS SAR pilotbackend', 'version' => '0.1.0', 'time' => now()]);
+        respond(['ok' => true, 'service' => 'DSRS SAR pilotbackend', 'version' => '0.1.1', 'time' => now()]);
     }
 
     if ($action === 'config' && $method === 'GET') {
-        respond(['ok' => true, 'vapidPublicKey' => $config['vapid_public'], 'backendVersion' => '0.1.0']);
+        respond(['ok' => true, 'vapidPublicKey' => $config['vapid_public'], 'backendVersion' => '0.1.1']);
     }
 
     if ($action === 'session' && $method === 'GET') {
@@ -105,7 +105,7 @@ try {
 
     if ($action === 'current' && $method === 'GET') {
         $subscription = requireDevice($db);
-        $statement = $db->prepare('SELECT a.*, d.delivery_token, d.push_sent_at, d.app_received_at, d.notification_shown_at, d.response, d.response_at FROM alarms a JOIN deliveries d ON d.alarm_id=a.id WHERE d.subscription_id=:subscription_id ORDER BY a.created_at DESC LIMIT 1');
+        $statement = $db->prepare('SELECT a.*, d.delivery_token, d.push_sent_at, d.app_received_at, d.notification_shown_at, d.response, d.response_at FROM alarms a JOIN deliveries d ON d.alarm_id=a.id WHERE d.subscription_id=:subscription_id AND a.completed_at IS NULL ORDER BY a.created_at DESC LIMIT 1');
         $statement->execute([':subscription_id' => $subscription['id']]);
         $row = $statement->fetch();
         respond(['ok' => true, 'alarm' => $row ? alarmPayload($row, $row['delivery_token']) : null, 'delivery' => $row ? deliveryPayload($row) : null]);
@@ -151,6 +151,7 @@ try {
             respond(['ok' => false, 'error' => 'Alarmtype, position og mindst en enhed er paakraevet.'], 422);
         }
         $db->beginTransaction();
+        $db->prepare("UPDATE alarms SET completed_at=:completed_at, completed_by='superseded' WHERE completed_at IS NULL")->execute([':completed_at' => now()]);
         $db->prepare('INSERT INTO alarms(id,type,priority,location,message,units_json,created_at,created_by) VALUES(:id,:type,:priority,:location,:message,:units,:created_at,:created_by)')->execute([
             ':id' => $alarm['id'], ':type' => $alarm['type'], ':priority' => $alarm['priority'], ':location' => $alarm['location'], ':message' => $alarm['message'], ':units' => json_encode($alarm['units'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), ':created_at' => $alarm['createdAt'], ':created_by' => 'control',
         ]);
@@ -198,11 +199,29 @@ try {
 
     if ($action === 'status' && $method === 'GET') {
         requireAdmin();
-        $alarm = $db->query('SELECT * FROM alarms ORDER BY created_at DESC LIMIT 1')->fetch();
+        $alarm = $db->query('SELECT * FROM alarms WHERE completed_at IS NULL ORDER BY created_at DESC LIMIT 1')->fetch();
         if (!$alarm) respond(['ok' => true, 'alarm' => null, 'deliveries' => []]);
         $statement = $db->prepare('SELECT d.push_sent_at,d.app_received_at,d.notification_shown_at,d.response,d.response_at,d.last_error,s.crew_name,s.device_id FROM deliveries d JOIN subscriptions s ON s.id=d.subscription_id WHERE d.alarm_id=:alarm_id ORDER BY s.crew_name');
         $statement->execute([':alarm_id' => $alarm['id']]);
         respond(['ok' => true, 'alarm' => alarmPayload($alarm), 'deliveries' => $statement->fetchAll()]);
+    }
+
+    if ($action === 'complete' && $method === 'POST') {
+        requireAdmin();
+        requireCsrf();
+        $body = body();
+        $alarmId = clean((string) ($body['alarmId'] ?? ''), 100);
+        if ($alarmId === '') {
+            $row = $db->query('SELECT id FROM alarms WHERE completed_at IS NULL ORDER BY created_at DESC LIMIT 1')->fetch();
+            $alarmId = (string) ($row['id'] ?? '');
+        }
+        if ($alarmId === '') respond(['ok' => false, 'error' => 'Der er ingen aktiv alarm.'], 404);
+        $completedAt = now();
+        $statement = $db->prepare('UPDATE alarms SET completed_at=:completed_at, completed_by=:completed_by WHERE id=:id AND completed_at IS NULL');
+        $statement->execute([':completed_at' => $completedAt, ':completed_by' => 'control', ':id' => $alarmId]);
+        if ($statement->rowCount() !== 1) respond(['ok' => false, 'error' => 'Alarmen er allerede afsluttet eller findes ikke.'], 409);
+        audit($db, 'alarm_completed', $alarmId, ['completedBy' => 'control']);
+        respond(['ok' => true, 'alarmId' => $alarmId, 'completedAt' => $completedAt]);
     }
 
     respond(['ok' => false, 'error' => 'Ukendt API-kald.'], 404);
@@ -216,7 +235,12 @@ function database(string $path): PDO
 {
     $db = new PDO('sqlite:' . $path, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
     $db->exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
-    $db->exec('CREATE TABLE IF NOT EXISTS subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, endpoint TEXT NOT NULL UNIQUE, subscription_json TEXT NOT NULL, device_id TEXT NOT NULL, device_token_hash TEXT NOT NULL, crew_name TEXT NOT NULL, station TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_seen_at TEXT); CREATE INDEX IF NOT EXISTS idx_subscriptions_token ON subscriptions(device_token_hash); CREATE TABLE IF NOT EXISTS alarms (id TEXT PRIMARY KEY, type TEXT NOT NULL, priority TEXT NOT NULL, location TEXT NOT NULL, message TEXT NOT NULL, units_json TEXT NOT NULL, created_at TEXT NOT NULL, created_by TEXT NOT NULL); CREATE TABLE IF NOT EXISTS deliveries (id INTEGER PRIMARY KEY AUTOINCREMENT, alarm_id TEXT NOT NULL, subscription_id INTEGER NOT NULL, delivery_token TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, push_sent_at TEXT, app_received_at TEXT, notification_shown_at TEXT, response TEXT, response_at TEXT, last_error TEXT, FOREIGN KEY(alarm_id) REFERENCES alarms(id), FOREIGN KEY(subscription_id) REFERENCES subscriptions(id)); CREATE INDEX IF NOT EXISTS idx_deliveries_alarm ON deliveries(alarm_id); CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, alarm_id TEXT, metadata_json TEXT NOT NULL, created_at TEXT NOT NULL);');
+    $db->exec('CREATE TABLE IF NOT EXISTS subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, endpoint TEXT NOT NULL UNIQUE, subscription_json TEXT NOT NULL, device_id TEXT NOT NULL, device_token_hash TEXT NOT NULL, crew_name TEXT NOT NULL, station TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_seen_at TEXT); CREATE INDEX IF NOT EXISTS idx_subscriptions_token ON subscriptions(device_token_hash); CREATE TABLE IF NOT EXISTS alarms (id TEXT PRIMARY KEY, type TEXT NOT NULL, priority TEXT NOT NULL, location TEXT NOT NULL, message TEXT NOT NULL, units_json TEXT NOT NULL, created_at TEXT NOT NULL, created_by TEXT NOT NULL, completed_at TEXT, completed_by TEXT); CREATE TABLE IF NOT EXISTS deliveries (id INTEGER PRIMARY KEY AUTOINCREMENT, alarm_id TEXT NOT NULL, subscription_id INTEGER NOT NULL, delivery_token TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, push_sent_at TEXT, app_received_at TEXT, notification_shown_at TEXT, response TEXT, response_at TEXT, last_error TEXT, FOREIGN KEY(alarm_id) REFERENCES alarms(id), FOREIGN KEY(subscription_id) REFERENCES subscriptions(id)); CREATE INDEX IF NOT EXISTS idx_deliveries_alarm ON deliveries(alarm_id); CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, alarm_id TEXT, metadata_json TEXT NOT NULL, created_at TEXT NOT NULL);');
+    $columns = array_column($db->query('PRAGMA table_info(alarms)')->fetchAll(), 'name');
+    if (!in_array('completed_at', $columns, true)) $db->exec('ALTER TABLE alarms ADD COLUMN completed_at TEXT');
+    if (!in_array('completed_by', $columns, true)) $db->exec('ALTER TABLE alarms ADD COLUMN completed_by TEXT');
+    $normalise = $db->prepare("UPDATE alarms SET completed_at=:completed_at, completed_by='migration' WHERE completed_at IS NULL AND id NOT IN (SELECT id FROM alarms WHERE completed_at IS NULL ORDER BY created_at DESC LIMIT 1)");
+    $normalise->execute([':completed_at' => now()]);
     return $db;
 }
 

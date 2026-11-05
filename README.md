@@ -4,6 +4,7 @@ En buildless pilot til Dansk Søredningsselskab med kontrolcentral, installerbar
 
 - SAR-kontrolcentral til at oprette og udsende maritime alarmer med leveringskvitteringer.
 - Installerbar besætnings-PWA med Web Push, systemlyd/vibration, SAR-tone, position, situationsmelding og valget Accepteret / Ej accepteret.
+- Aktiv alarm kan afsluttes fra kontrolcentralen; den fjernes derefter automatisk i registrerede apps.
 - Projektmapping fra prototype til robust, integreret alarmplatform.
 
 ## Pilotens tekniske afgrænsning

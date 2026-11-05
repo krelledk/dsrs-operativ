@@ -1,5 +1,5 @@
-const CACHE='dsrs-operativ-v12';
-const APP_SHELL=['./','index.html','styles.css?v=12','app.js?v=12','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
+const CACHE='dsrs-operativ-v14';
+const APP_SHELL=['./','index.html','styles.css?v=14','app.js?v=14','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
 
 self.addEventListener('install',event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting())
@@ -39,6 +39,7 @@ self.addEventListener('push',event=>{
 
 self.addEventListener('message',event=>{
   if(event.data?.type==='SHOW_ALARM')event.waitUntil(self.registration.showNotification(event.data.title,event.data.options));
+  if(event.data?.type==='CLEAR_ALARM')event.waitUntil((async()=>{const notifications=await self.registration.getNotifications(event.data.tag?{tag:event.data.tag}:undefined);notifications.forEach(notification=>notification.close());if('clearAppBadge'in self.registration)await self.registration.clearAppBadge().catch(()=>null)})());
   if(event.data?.type==='SKIP_WAITING')self.skipWaiting();
 });
 

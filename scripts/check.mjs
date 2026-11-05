@@ -34,11 +34,15 @@ for (const size of ['192x192', '512x512']) {
   if (!manifest.icons?.some((icon) => icon.sizes === size && icon.type === 'image/png')) throw new Error(`PWA-ikon mangler: ${size}`);
 }
 if (!manifest.icons?.some((icon) => icon.purpose === 'maskable')) throw new Error('Maskable PWA-ikon mangler.');
-for (const marker of ['DSRS', 'SAR kontrolcentral', 'Accepteret', 'Ej accepteret', 'Test lyd']) {
+for (const marker of ['DSRS', 'SAR kontrolcentral', 'Accepteret', 'Ej accepteret', 'Test lyd', 'Afslut alarm']) {
   if (!html.includes(marker)) throw new Error(`Påkrævet UI-markør mangler: ${marker}`);
 }
-for (const marker of ['startAlarmSound', 'primeAlarmSound', 'loadCurrentAlarm(true)']) {
+for (const marker of ['startAlarmSound', 'primeAlarmSound', 'createAlarmWav', 'completeRemoteAlarm', 'loadCurrentAlarm(true)']) {
   if (!app.includes(marker)) throw new Error(`Alarmlyd/fallback mangler: ${marker}`);
+}
+const api = await readFile('dist/api/index.php', 'utf8');
+for (const marker of ["$action === 'complete'", 'completed_at IS NULL', 'alarm_completed', "completed_by='superseded'"]) {
+  if (!api.includes(marker)) throw new Error(`Alarm-afslutning mangler: ${marker}`);
 }
 for (const marker of ['silent:false', 'vibrate:', 'setAppBadge']) {
   if (!serviceWorker.includes(marker)) throw new Error(`Push-alarmering mangler: ${marker}`);
