@@ -14,6 +14,7 @@ const required = [
   'docs/MOBILE-AND-PUSH-COMPATIBILITY.md',
   'docs/PRODUCT-BENCHMARK-AND-ROADMAP.md',
   'docs/PHASE-1-MULTI-STATION-FOUNDATION.md',
+  'docs/PHASE-1B-CREW-IDENTITY.md',
   'dist/icon.svg',
   'dist/icon-192.png',
   'dist/icon-512.png',
@@ -38,14 +39,14 @@ for (const size of ['192x192', '512x512']) {
   if (!manifest.icons?.some((icon) => icon.sizes === size && icon.type === 'image/png')) throw new Error(`PWA-ikon mangler: ${size}`);
 }
 if (!manifest.icons?.some((icon) => icon.purpose === 'maskable')) throw new Error('Maskable PWA-ikon mangler.');
-for (const marker of ['DSRS', 'SAR kontrolcentral', 'Accepteret', 'Ej accepteret', 'Test lyd', 'Afslut alarm', 'Par denne mobil', 'FireServiceRota', 'Maritim mission', 'Minimum sikkert crew', '14+ stationer', 'Samtidige hændelser']) {
+for (const marker of ['DSRS', 'SAR kontrolcentral', 'Accepteret', 'Ej accepteret', 'Test lyd', 'Afslut alarm', 'Par denne mobil', 'Primær rolle', 'Kompetencer', 'FireServiceRota', 'Maritim mission', 'Minimum sikkert crew', '14+ stationer', 'Samtidige hændelser']) {
   if (!html.includes(marker)) throw new Error(`Påkrævet UI-markør mangler: ${marker}`);
 }
-for (const marker of ['startAlarmSound', 'primeAlarmSound', 'createAlarmWav', 'completeRemoteAlarm', 'loadCurrentAlarm(true)', 'renewDeviceRegistration', 'freshPushSubscription(true)', 'updateMobilePairing', 'isResponderApp()){write(STORAGE.current,null)', 'isResponderApp()&&width>480']) {
+for (const marker of ['startAlarmSound', 'primeAlarmSound', 'createAlarmWav', 'completeRemoteAlarm', 'loadCurrentAlarm(true)', 'renewDeviceRegistration', 'freshPushSubscription(true)', 'updateMobilePairing', 'populateCrewProfile', 'storePersonProfile', 'isResponderApp()){write(STORAGE.current,null)', 'isResponderApp()&&width>480']) {
   if (!app.includes(marker)) throw new Error(`Alarmlyd/fallback mangler: ${marker}`);
 }
 const api = await readFile('dist/api/index.php', 'utf8');
-for (const marker of ["$action === 'complete'", 'completed_at IS NULL', 'alarm_completed', "completed_by='superseded'", 'station_id', 'publicStations', 'vessel_ids_json', 'station-faxe-ladeplads', 'device_subscription_renewed', 'active_alarm_recovered_by_app']) {
+for (const marker of ["$action === 'complete'", 'completed_at IS NULL', 'alarm_completed', "completed_by='superseded'", 'station_id', 'publicStations', 'vessel_ids_json', 'station-faxe-ladeplads', 'device_subscription_renewed', 'active_alarm_recovered_by_app', 'person_identities', 'station_memberships', 'person_competencies', 'vessel_competency_requirements', 'ensureCrewProfile', 'crewProfileOptions']) {
   if (!api.includes(marker)) throw new Error(`Alarm-afslutning mangler: ${marker}`);
 }
 for (const marker of ['silent:false', 'vibrate:', 'setAppBadge']) {

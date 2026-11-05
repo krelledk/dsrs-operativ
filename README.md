@@ -7,7 +7,7 @@ En buildless pilot til Dansk Søredningsselskab med kontrolcentral, installerbar
 - Aktiv alarm kan afsluttes fra kontrolcentralen; den fjernes derefter automatisk i registrerede apps.
 - Projektmapping fra prototype til robust, integreret alarmplatform.
 
-Det færdige produkt har et bindende skaleringskrav på mindst 14 aktive stationer, flere fartøjer pr. station, samtidige hændelser og tværgående nabostationsindsats. Den nuværende MVP er fortsat en enkeltstationspilot; produktionsdatamodellen skal fjerne alle antagelser om én station, ét fartøj eller én global aktiv alarm.
+Det færdige produkt har et bindende skaleringskrav på mindst 14 aktive stationer, flere fartøjer pr. station, samtidige hændelser og tværgående nabostationsindsats. MVP'en har nu et multi-stationsfundament, men kun Køge har konfigurerede pilotfartøjer og aktiv afprøvning.
 
 ## Pilotens tekniske afgrænsning
 
@@ -17,7 +17,7 @@ Pilotdomæne: `https://alarm.hansenlabs.dk`.
 
 Se [mobil-, web- og pushkompatibilitet](docs/MOBILE-AND-PUSH-COMPATIBILITY.md) og den samlede [produktbenchmark, maritime funktionskortlægning og roadmap](docs/PRODUCT-BENCHMARK-AND-ROADMAP.md).
 
-Fase 1 er påbegyndt med det [bagudkompatible multi-station- og fartøjsfundament](docs/PHASE-1-MULTI-STATION-FOUNDATION.md).
+Fase 1 er påbegyndt med det [bagudkompatible multi-station- og fartøjsfundament](docs/PHASE-1-MULTI-STATION-FOUNDATION.md) samt [person-, medlemskabs- og kompetencegrundlaget](docs/PHASE-1B-CREW-IDENTITY.md).
 
 ## Ejerskab og versionering
 

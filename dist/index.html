@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=21">
+  <link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body>
   <div class="shell">
@@ -159,6 +159,7 @@
               <div><strong id="response-wait">2</strong><span>Afventer svar</span></div>
             </div>
             <div class="progress"><span id="response-progress" style="width:100%"></span></div>
+            <div class="qualification-note" id="qualification-note"><b>Kompetencegrundlag</b><span>Pilotoplysninger er ikke verificeret endnu og må ikke bruges som endelig crew-godkendelse.</span></div>
             <div class="crew-list" id="crew-list"></div>
           </section>
         </div>
@@ -346,11 +347,20 @@
           <option value="station-koege">DSRS Køge</option>
         </select>
       </label>
+      <label>Primær rolle
+        <select id="crew-role" required>
+          <option value="role-crew">Besætningsmedlem</option>
+        </select>
+      </label>
+      <fieldset class="competency-fieldset">
+        <legend>Kompetencer <span>— selvangivet i pilotfasen</span></legend>
+        <div class="competency-picker" id="competency-picker"></div>
+      </fieldset>
       <label>Stationskode<input id="station-code" type="password" required minlength="8" autocomplete="one-time-code" autocapitalize="none" spellcheck="false"></label>
       <p id="device-status" class="device-status" role="status" aria-live="polite">Tryk på knappen, og godkend derefter telefonens spørgsmål om notifikationer.</p>
       <button class="primary-button" type="submit">Registrer og aktivér push</button>
     </form>
   </dialog>
-<script src="app.js?v=21"></script>
+<script src="app.js?v=22"></script>
 </body>
 </html>

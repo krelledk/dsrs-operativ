@@ -40,11 +40,11 @@ $method = (string) $_SERVER['REQUEST_METHOD'];
 
 try {
     if ($action === 'health' && $method === 'GET') {
-        respond(['ok' => true, 'service' => 'DSRS SAR pilotbackend', 'version' => '0.2.1', 'time' => now()]);
+        respond(['ok' => true, 'service' => 'DSRS SAR pilotbackend', 'version' => '0.3.0', 'time' => now()]);
     }
 
     if ($action === 'config' && $method === 'GET') {
-        respond(['ok' => true, 'vapidPublicKey' => $config['vapid_public'], 'backendVersion' => '0.2.1', 'stations' => publicStations($db)]);
+        respond(['ok' => true, 'vapidPublicKey' => $config['vapid_public'], 'backendVersion' => '0.3.0', 'stations' => publicStations($db), 'crewProfile' => crewProfileOptions($db)]);
     }
 
     if ($action === 'session' && $method === 'GET') {
@@ -80,6 +80,9 @@ try {
         $stationId = clean((string) ($body['stationId'] ?? 'station-koege'), 80);
         $crewName = clean((string) ($body['crewName'] ?? ''), 80);
         $deviceId = clean((string) ($body['deviceId'] ?? ''), 100);
+        $roleId = clean((string) ($body['roleId'] ?? ''), 80);
+        $competencyIdsProvided = array_key_exists('competencyIds', $body);
+        $competencyIds = array_values(array_unique(array_slice(array_filter(array_map(fn($value) => clean((string) $value, 80), (array) ($body['competencyIds'] ?? []))), 0, 20)));
         $previousDeviceToken = trim((string) ($body['deviceToken'] ?? ''));
         $renewedSubscription = null;
         if ($previousDeviceToken !== '') {
@@ -103,8 +106,9 @@ try {
         if ($crewName === '' || $deviceId === '' || !is_array($subscription) || !filter_var($endpoint, FILTER_VALIDATE_URL)) {
             respond(['ok' => false, 'error' => 'Ugyldige enhedsoplysninger.'], 422);
         }
+        $person = ensureCrewProfile($db, $crewName, $station['id'], $roleId, $competencyIds, $renewedSubscription, $competencyIdsProvided);
         $deviceToken = token(32);
-        $statement = $db->prepare('INSERT INTO subscriptions(endpoint, subscription_json, device_id, device_token_hash, crew_name, station, station_id, active, created_at, updated_at, last_seen_at) VALUES(:endpoint,:subscription,:device_id,:token_hash,:crew_name,:station,:station_id,1,:now,:now,:now) ON CONFLICT(endpoint) DO UPDATE SET subscription_json=excluded.subscription_json, device_id=excluded.device_id, device_token_hash=excluded.device_token_hash, crew_name=excluded.crew_name, station=excluded.station, station_id=excluded.station_id, active=1, updated_at=excluded.updated_at, last_seen_at=excluded.last_seen_at');
+        $statement = $db->prepare('INSERT INTO subscriptions(endpoint, subscription_json, device_id, device_token_hash, crew_name, station, station_id, person_id, active, created_at, updated_at, last_seen_at) VALUES(:endpoint,:subscription,:device_id,:token_hash,:crew_name,:station,:station_id,:person_id,1,:now,:now,:now) ON CONFLICT(endpoint) DO UPDATE SET subscription_json=excluded.subscription_json, device_id=excluded.device_id, device_token_hash=excluded.device_token_hash, crew_name=excluded.crew_name, station=excluded.station, station_id=excluded.station_id, person_id=excluded.person_id, active=1, updated_at=excluded.updated_at, last_seen_at=excluded.last_seen_at');
         $statement->execute([
             ':endpoint' => $endpoint,
             ':subscription' => json_encode($subscription, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
@@ -113,10 +117,11 @@ try {
             ':crew_name' => $crewName,
             ':station' => $station['slug'],
             ':station_id' => $station['id'],
+            ':person_id' => $person['id'],
             ':now' => now(),
         ]);
-        audit($db, $renewedSubscription ? 'device_subscription_renewed' : 'device_subscribed', null, ['crewName' => $crewName, 'deviceId' => $deviceId, 'stationId' => $station['id']]);
-        respond(['ok' => true, 'deviceToken' => $deviceToken, 'crewName' => $crewName, 'renewed' => (bool) $renewedSubscription, 'station' => ['id' => $station['id'], 'name' => $station['name']]]);
+        audit($db, $renewedSubscription ? 'device_subscription_renewed' : 'device_subscribed', null, ['personId' => $person['id'], 'crewName' => $person['name'], 'deviceId' => $deviceId, 'stationId' => $station['id'], 'roleId' => $person['role']['id']]);
+        respond(['ok' => true, 'deviceToken' => $deviceToken, 'crewName' => $person['name'], 'renewed' => (bool) $renewedSubscription, 'person' => $person, 'station' => ['id' => $station['id'], 'name' => $station['name']]]);
     }
 
     if ($action === 'current' && $method === 'GET') {
@@ -251,8 +256,8 @@ try {
         $alarm = $alarmStatement->fetch();
         $activeCount = (int) $db->query('SELECT COUNT(*) FROM alarms WHERE completed_at IS NULL')->fetchColumn();
         if (!$alarm) respond(['ok' => true, 'alarm' => null, 'deliveries' => [], 'activeCount' => $activeCount]);
-        $statement = $db->prepare('SELECT d.push_sent_at,d.app_received_at,d.notification_shown_at,d.response,d.response_at,d.last_error,s.crew_name,s.device_id FROM deliveries d JOIN subscriptions s ON s.id=d.subscription_id WHERE d.alarm_id=:alarm_id ORDER BY s.crew_name');
-        $statement->execute([':alarm_id' => $alarm['id']]);
+        $statement = $db->prepare("SELECT d.push_sent_at,d.app_received_at,d.notification_shown_at,d.response,d.response_at,d.last_error,s.crew_name,s.device_id,s.person_id,COALESCE(p.display_name,s.crew_name) AS person_name,COALESCE(r.name,'Rolle ikke angivet') AS role_name,COALESCE(sm.role_status,'unverified') AS role_status,COALESCE((SELECT group_concat(c.name,' · ') FROM person_competencies pc JOIN competencies c ON c.id=pc.competency_id WHERE pc.person_id=s.person_id),'') AS competency_names FROM deliveries d JOIN subscriptions s ON s.id=d.subscription_id LEFT JOIN people p ON p.id=s.person_id LEFT JOIN station_memberships sm ON sm.person_id=s.person_id AND sm.station_id=:station_id AND sm.active=1 LEFT JOIN roles r ON r.id=sm.role_id WHERE d.alarm_id=:alarm_id ORDER BY person_name,s.device_id");
+        $statement->execute([':alarm_id' => $alarm['id'], ':station_id' => $alarm['station_id']]);
         respond(['ok' => true, 'alarm' => alarmPayload($alarm), 'deliveries' => $statement->fetchAll(), 'activeCount' => $activeCount]);
     }
 
@@ -291,7 +296,14 @@ function database(string $path): PDO
     $db->exec('CREATE TABLE IF NOT EXISTS organizations (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1);');
     $db->exec('CREATE TABLE IF NOT EXISTS stations (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, short_name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, display_order INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(organization_id) REFERENCES organizations(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS vessels (id TEXT PRIMARY KEY, station_id TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, type TEXT NOT NULL, crew_required INTEGER NOT NULL DEFAULT 1, active INTEGER NOT NULL DEFAULT 1, FOREIGN KEY(station_id) REFERENCES stations(id));');
-    $db->exec('CREATE TABLE IF NOT EXISTS subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, endpoint TEXT NOT NULL UNIQUE, subscription_json TEXT NOT NULL, device_id TEXT NOT NULL, device_token_hash TEXT NOT NULL, crew_name TEXT NOT NULL, station TEXT NOT NULL, station_id TEXT, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_seen_at TEXT);');
+    $db->exec('CREATE TABLE IF NOT EXISTS roles (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1);');
+    $db->exec('CREATE TABLE IF NOT EXISTS competencies (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1);');
+    $db->exec('CREATE TABLE IF NOT EXISTS people (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, name_key TEXT NOT NULL, display_name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(organization_id,name_key), FOREIGN KEY(organization_id) REFERENCES organizations(id));');
+    $db->exec('CREATE TABLE IF NOT EXISTS person_identities (id INTEGER PRIMARY KEY AUTOINCREMENT, person_id TEXT NOT NULL, provider TEXT NOT NULL, tenant_id TEXT NOT NULL DEFAULT \'\', external_subject TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(provider,tenant_id,external_subject), FOREIGN KEY(person_id) REFERENCES people(id));');
+    $db->exec('CREATE TABLE IF NOT EXISTS station_memberships (id INTEGER PRIMARY KEY AUTOINCREMENT, person_id TEXT NOT NULL, station_id TEXT NOT NULL, role_id TEXT NOT NULL, role_status TEXT NOT NULL DEFAULT \'unverified\', active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(person_id,station_id), FOREIGN KEY(person_id) REFERENCES people(id), FOREIGN KEY(station_id) REFERENCES stations(id), FOREIGN KEY(role_id) REFERENCES roles(id));');
+    $db->exec('CREATE TABLE IF NOT EXISTS person_competencies (person_id TEXT NOT NULL, competency_id TEXT NOT NULL, verification_status TEXT NOT NULL DEFAULT \'self_declared\', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(person_id,competency_id), FOREIGN KEY(person_id) REFERENCES people(id), FOREIGN KEY(competency_id) REFERENCES competencies(id));');
+    $db->exec('CREATE TABLE IF NOT EXISTS vessel_competency_requirements (vessel_id TEXT NOT NULL, competency_id TEXT NOT NULL, required_count INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(vessel_id,competency_id), FOREIGN KEY(vessel_id) REFERENCES vessels(id), FOREIGN KEY(competency_id) REFERENCES competencies(id));');
+    $db->exec('CREATE TABLE IF NOT EXISTS subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, endpoint TEXT NOT NULL UNIQUE, subscription_json TEXT NOT NULL, device_id TEXT NOT NULL, device_token_hash TEXT NOT NULL, crew_name TEXT NOT NULL, station TEXT NOT NULL, station_id TEXT, person_id TEXT, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_seen_at TEXT);');
     $db->exec('CREATE TABLE IF NOT EXISTS alarms (id TEXT PRIMARY KEY, station_id TEXT, vessel_ids_json TEXT NOT NULL DEFAULT \'[]\', type TEXT NOT NULL, priority TEXT NOT NULL, location TEXT NOT NULL, message TEXT NOT NULL, units_json TEXT NOT NULL, created_at TEXT NOT NULL, created_by TEXT NOT NULL, completed_at TEXT, completed_by TEXT);');
     $db->exec('CREATE TABLE IF NOT EXISTS deliveries (id INTEGER PRIMARY KEY AUTOINCREMENT, alarm_id TEXT NOT NULL, subscription_id INTEGER NOT NULL, delivery_token TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, push_sent_at TEXT, app_received_at TEXT, notification_shown_at TEXT, response TEXT, response_at TEXT, last_error TEXT, FOREIGN KEY(alarm_id) REFERENCES alarms(id), FOREIGN KEY(subscription_id) REFERENCES subscriptions(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, alarm_id TEXT, metadata_json TEXT NOT NULL, created_at TEXT NOT NULL);');
@@ -303,6 +315,7 @@ function database(string $path): PDO
     if (!in_array('vessel_ids_json', $alarmColumns, true)) $db->exec("ALTER TABLE alarms ADD COLUMN vessel_ids_json TEXT NOT NULL DEFAULT '[]'");
     $subscriptionColumns = array_column($db->query('PRAGMA table_info(subscriptions)')->fetchAll(), 'name');
     if (!in_array('station_id', $subscriptionColumns, true)) $db->exec('ALTER TABLE subscriptions ADD COLUMN station_id TEXT');
+    if (!in_array('person_id', $subscriptionColumns, true)) $db->exec('ALTER TABLE subscriptions ADD COLUMN person_id TEXT');
 
     $db->prepare('INSERT OR IGNORE INTO organizations(id,slug,name,active) VALUES(:id,:slug,:name,1)')->execute([':id' => 'org-dsrs', ':slug' => 'dsrs', ':name' => 'Dansk Søredningsselskab']);
     $stations = [
@@ -327,9 +340,23 @@ function database(string $path): PDO
     $vesselInsert->execute([':id' => 'vessel-rs-koege', ':station_id' => 'station-koege', ':slug' => 'rs-koege', ':name' => 'RS Køge', ':type' => 'Redningsfartøj', ':crew_required' => 4]);
     $vesselInsert->execute([':id' => 'vessel-rhib-01', ':station_id' => 'station-koege', ':slug' => 'rhib-01', ':name' => 'RHIB 01', ':type' => 'RHIB', ':crew_required' => 2]);
 
+    $roleInsert = $db->prepare('INSERT OR IGNORE INTO roles(id,code,name,active) VALUES(:id,:code,:name,1)');
+    foreach ([
+        ['role-crew','crew','Besætningsmedlem'],['role-rescuer','rescuer','Søredder'],['role-boatmaster','boatmaster','Bådfører'],['role-navigator','navigator','Navigatør'],['role-medic','medic','Førstehjælper'],['role-engineer','engineer','Maskinansvarlig'],['role-station-lead','station-lead','Stationsleder'],
+    ] as [$id,$code,$name]) $roleInsert->execute([':id' => $id, ':code' => $code, ':name' => $name]);
+    $competencyInsert = $db->prepare('INSERT OR IGNORE INTO competencies(id,code,name,active) VALUES(:id,:code,:name,1)');
+    foreach ([
+        ['competency-vhf-src','vhf-src','VHF/SRC'],['competency-first-aid','first-aid','Førstehjælp'],['competency-boatmaster','boatmaster','Bådfører'],['competency-navigation','navigation','Navigation'],['competency-engine','engine','Maskinansvarlig'],['competency-local-water','local-water','Lokalkendskab'],
+    ] as [$id,$code,$name]) $competencyInsert->execute([':id' => $id, ':code' => $code, ':name' => $name]);
+
     $db->exec("UPDATE subscriptions SET station_id='station-koege' WHERE station_id IS NULL OR station_id=''");
     $db->exec("UPDATE alarms SET station_id='station-koege' WHERE station_id IS NULL OR station_id=''");
-    $db->exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_token ON subscriptions(device_token_hash); CREATE INDEX IF NOT EXISTS idx_subscriptions_station ON subscriptions(station_id,active); CREATE INDEX IF NOT EXISTS idx_alarms_station_active ON alarms(station_id,completed_at,created_at); CREATE INDEX IF NOT EXISTS idx_deliveries_alarm ON deliveries(alarm_id);');
+    $legacySubscriptions = $db->query("SELECT id,crew_name,station_id FROM subscriptions WHERE person_id IS NULL OR person_id='' ORDER BY id")->fetchAll();
+    foreach ($legacySubscriptions as $legacySubscription) {
+        $profile = ensureCrewProfile($db, (string) $legacySubscription['crew_name'], (string) $legacySubscription['station_id'], 'role-crew', [], null, false);
+        $db->prepare('UPDATE subscriptions SET person_id=:person_id WHERE id=:id')->execute([':person_id' => $profile['id'], ':id' => $legacySubscription['id']]);
+    }
+    $db->exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_token ON subscriptions(device_token_hash); CREATE INDEX IF NOT EXISTS idx_subscriptions_station ON subscriptions(station_id,active); CREATE INDEX IF NOT EXISTS idx_subscriptions_person ON subscriptions(person_id,active); CREATE INDEX IF NOT EXISTS idx_memberships_station ON station_memberships(station_id,active); CREATE INDEX IF NOT EXISTS idx_alarms_station_active ON alarms(station_id,completed_at,created_at); CREATE INDEX IF NOT EXISTS idx_deliveries_alarm ON deliveries(alarm_id);');
     return $db;
 }
 
@@ -376,6 +403,81 @@ function alarmPayload(array $row, ?string $deliveryToken = null): array
     $payload = ['id' => $row['id'], 'stationId' => $row['station_id'] ?? 'station-koege', 'stationName' => $row['station_name'] ?? 'DSRS Køge', 'vesselIds' => json_decode((string) ($row['vessel_ids_json'] ?? '[]'), true) ?: [], 'type' => $row['type'], 'priority' => $row['priority'], 'location' => $row['location'], 'message' => $row['message'], 'units' => json_decode($row['units_json'], true) ?: [], 'createdAt' => $row['created_at']];
     if ($deliveryToken !== null) $payload['deliveryToken'] = $deliveryToken;
     return $payload;
+}
+
+function crewProfileOptions(PDO $db): array
+{
+    $roles = array_map(static fn(array $row): array => ['id' => $row['id'], 'name' => $row['name']], $db->query('SELECT id,name FROM roles WHERE active=1 ORDER BY name')->fetchAll());
+    $competencies = array_map(static fn(array $row): array => ['id' => $row['id'], 'name' => $row['name']], $db->query('SELECT id,name FROM competencies WHERE active=1 ORDER BY name')->fetchAll());
+    return ['roles' => $roles, 'competencies' => $competencies, 'verification' => 'self_declared'];
+}
+
+function ensureCrewProfile(PDO $db, string $crewName, string $stationId, string $roleId, array $competencyIds, ?array $renewedSubscription, bool $competenciesProvided): array
+{
+    $normalizedName = preg_replace('/\s+/u', ' ', trim($crewName)) ?: trim($crewName);
+    $nameKey = mb_strtolower($normalizedName, 'UTF-8');
+    $person = null;
+    $renewedPersonId = clean((string) ($renewedSubscription['person_id'] ?? ''), 100);
+    if ($renewedPersonId !== '') {
+        $personStatement = $db->prepare('SELECT * FROM people WHERE id=:id AND active=1 LIMIT 1');
+        $personStatement->execute([':id' => $renewedPersonId]);
+        $person = $personStatement->fetch() ?: null;
+    }
+    if (!$person) {
+        $personStatement = $db->prepare('SELECT * FROM people WHERE organization_id=:organization_id AND name_key=:name_key AND active=1 LIMIT 1');
+        $personStatement->execute([':organization_id' => 'org-dsrs', ':name_key' => $nameKey]);
+        $person = $personStatement->fetch() ?: null;
+    }
+    if (!$person) {
+        $personId = 'person-' . substr(hash('sha256', 'org-dsrs|' . $nameKey), 0, 20);
+        $db->prepare('INSERT INTO people(id,organization_id,name_key,display_name,active,created_at,updated_at) VALUES(:id,:organization_id,:name_key,:display_name,1,:now,:now)')->execute([
+            ':id' => $personId, ':organization_id' => 'org-dsrs', ':name_key' => $nameKey, ':display_name' => $normalizedName, ':now' => now(),
+        ]);
+        $person = ['id' => $personId, 'display_name' => $normalizedName];
+    } else {
+        $db->prepare('UPDATE people SET display_name=:display_name,updated_at=:updated_at WHERE id=:id')->execute([':display_name' => $normalizedName, ':updated_at' => now(), ':id' => $person['id']]);
+        $person['display_name'] = $normalizedName;
+    }
+
+    $membershipStatement = $db->prepare('SELECT * FROM station_memberships WHERE person_id=:person_id AND station_id=:station_id LIMIT 1');
+    $membershipStatement->execute([':person_id' => $person['id'], ':station_id' => $stationId]);
+    $membership = $membershipStatement->fetch() ?: null;
+    if ($roleId === '') $roleId = (string) ($membership['role_id'] ?? 'role-crew');
+    $roleStatement = $db->prepare('SELECT id FROM roles WHERE id=:id AND active=1 LIMIT 1');
+    $roleStatement->execute([':id' => $roleId]);
+    if (!$roleStatement->fetch()) respond(['ok' => false, 'error' => 'Den valgte rolle findes ikke.'], 422);
+    $db->prepare("INSERT INTO station_memberships(person_id,station_id,role_id,role_status,active,created_at,updated_at) VALUES(:person_id,:station_id,:role_id,'self_declared',1,:now,:now) ON CONFLICT(person_id,station_id) DO UPDATE SET role_id=excluded.role_id,role_status=CASE WHEN station_memberships.role_status='verified' THEN station_memberships.role_status ELSE excluded.role_status END,active=1,updated_at=excluded.updated_at")->execute([
+        ':person_id' => $person['id'], ':station_id' => $stationId, ':role_id' => $roleId, ':now' => now(),
+    ]);
+
+    if ($competenciesProvided) {
+        if ($competencyIds !== []) {
+            $placeholders = implode(',', array_fill(0, count($competencyIds), '?'));
+            $competencyStatement = $db->prepare("SELECT id FROM competencies WHERE active=1 AND id IN ($placeholders)");
+            $competencyStatement->execute($competencyIds);
+            if (count($competencyStatement->fetchAll()) !== count($competencyIds)) respond(['ok' => false, 'error' => 'En eller flere valgte kompetencer findes ikke.'], 422);
+        }
+        $db->prepare("DELETE FROM person_competencies WHERE person_id=:person_id AND verification_status='self_declared'")->execute([':person_id' => $person['id']]);
+        $competencyInsert = $db->prepare("INSERT INTO person_competencies(person_id,competency_id,verification_status,created_at,updated_at) VALUES(:person_id,:competency_id,'self_declared',:now,:now) ON CONFLICT(person_id,competency_id) DO UPDATE SET updated_at=excluded.updated_at");
+        foreach ($competencyIds as $competencyId) $competencyInsert->execute([':person_id' => $person['id'], ':competency_id' => $competencyId, ':now' => now()]);
+    }
+    return personProfile($db, (string) $person['id'], $stationId);
+}
+
+function personProfile(PDO $db, string $personId, string $stationId): array
+{
+    $statement = $db->prepare("SELECT p.id,p.display_name,r.id AS role_id,r.name AS role_name,sm.role_status FROM people p JOIN station_memberships sm ON sm.person_id=p.id AND sm.station_id=:station_id AND sm.active=1 JOIN roles r ON r.id=sm.role_id WHERE p.id=:person_id AND p.active=1 LIMIT 1");
+    $statement->execute([':station_id' => $stationId, ':person_id' => $personId]);
+    $person = $statement->fetch();
+    if (!$person) respond(['ok' => false, 'error' => 'Personprofilen kunne ikke oprettes.'], 500);
+    $competencyStatement = $db->prepare('SELECT c.id,c.name,pc.verification_status FROM person_competencies pc JOIN competencies c ON c.id=pc.competency_id WHERE pc.person_id=:person_id AND c.active=1 ORDER BY c.name');
+    $competencyStatement->execute([':person_id' => $personId]);
+    return [
+        'id' => $person['id'],
+        'name' => $person['display_name'],
+        'role' => ['id' => $person['role_id'], 'name' => $person['role_name'], 'verificationStatus' => $person['role_status']],
+        'competencies' => array_map(static fn(array $row): array => ['id' => $row['id'], 'name' => $row['name'], 'verificationStatus' => $row['verification_status']], $competencyStatement->fetchAll()),
+    ];
 }
 
 function publicStations(PDO $db): array
