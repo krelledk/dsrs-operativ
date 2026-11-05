@@ -274,6 +274,10 @@ Tidsangivelserne er retningsgivende fra godkendt start med et lille fokuseret pr
 
 ## 9. UI/UX-koncept
 
+![DSRS Operativ — webkontrolcentral og besætningsapp](assets/dsrs-operativ-app-og-web-koncept-v1.png)
+
+Konceptbilledet viser samme SAR-hændelse i kontrolcentralen og på besætningens telefon. Det er et visuelt designmål, ikke dokumentation af allerede implementeret funktionalitet.
+
 ### 9.1 Designprincipper
 
 1. **Beslutning før data:** Første skærm viser “Har vi sikkert crew?” og “Hvad kræver handling nu?”
