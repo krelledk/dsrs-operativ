@@ -39,7 +39,7 @@ if (!manifest.icons?.some((icon) => icon.purpose === 'maskable')) throw new Erro
 for (const marker of ['DSRS', 'SAR kontrolcentral', 'Accepteret', 'Ej accepteret', 'Test lyd', 'Afslut alarm', 'Par denne mobil', 'FireServiceRota', 'Maritim mission', 'Minimum sikkert crew', '14+ stationer', 'Samtidige hændelser']) {
   if (!html.includes(marker)) throw new Error(`Påkrævet UI-markør mangler: ${marker}`);
 }
-for (const marker of ['startAlarmSound', 'primeAlarmSound', 'createAlarmWav', 'completeRemoteAlarm', 'loadCurrentAlarm(true)', 'renewDeviceRegistration', 'freshPushSubscription(true)', 'updateMobilePairing', 'isResponderApp()){write(STORAGE.current,null)']) {
+for (const marker of ['startAlarmSound', 'primeAlarmSound', 'createAlarmWav', 'completeRemoteAlarm', 'loadCurrentAlarm(true)', 'renewDeviceRegistration', 'freshPushSubscription(true)', 'updateMobilePairing', 'isResponderApp()){write(STORAGE.current,null)', 'isResponderApp()&&width>480']) {
   if (!app.includes(marker)) throw new Error(`Alarmlyd/fallback mangler: ${marker}`);
 }
 const api = await readFile('dist/api/index.php', 'utf8');

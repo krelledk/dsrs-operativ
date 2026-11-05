@@ -1,6 +1,6 @@
 # Fase 1A — multi-station- og fartøjsfundament
 
-**Version:** 0.8.2
+**Version:** 0.8.3
 **Dato:** 5. november 2026
 
 ## Leveret i denne del
@@ -45,6 +45,10 @@ Hvis Android/iOS-pushtjenesten erklærer et abonnement udløbet, markerer server
 ## Mobil onboarding 0.8.2
 
 Den installerede app viser nu enhedens parringsstatus og handlingen **Par denne mobil** direkte i alarmvisningen. En mobil uden gyldig registrering rydder en tidligere lokal demo- eller testalarm, så den ikke fejlagtigt fremstår som en aktiv serveralarm.
+
+## Adaptiv mobilvisning 0.8.3
+
+Installerede Android-visninger, der rapporterer en usædvanligt bred CSS-viewport, normaliseres til en læsbar 390-pixel appflade. Typografi, statuskort og trykflader har samtidig fået større minimumsstørrelser på almindelige mobilskærme.
 
 ## Næste del
 
