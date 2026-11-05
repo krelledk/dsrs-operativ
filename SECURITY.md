@@ -13,6 +13,6 @@ Dette repository må aldrig indeholde produktionshemmeligheder, private nøgler,
 
 Indtil DSRS har fastlagt en sikkerhedskontakt, rapporteres sårbarheder direkte til projektets udpegede ejer og ikke som et offentligt issue.
 
-## Prototypeafgrænsning
+## Pilotafgrænsning
 
-Den nuværende PWA er en interaktionsprototype. Den må ikke anvendes som eneste eller primære alarmeringskanal i operative SAR-hændelser.
+Den nuværende PWA og Web Push-backend er en pilot. Den må ikke anvendes som eneste eller primære alarmeringskanal i operative SAR-hændelser, før en dokumenteret fallbackkanal, overvågning og beredskabsprocedure er godkendt.

@@ -171,7 +171,7 @@ try {
                 'title' => 'DSRS SAR-ALARM · ' . $alarm['type'],
                 'body' => $alarm['location'] . "\n" . $alarm['message'],
                 'tag' => $alarm['id'],
-                'url' => '/#responder?delivery=' . rawurlencode($delivery['token']),
+                'url' => '/#responder?delivery=' . rawurlencode($delivery['token']) . '&alert=1',
                 'alarm' => $alarm,
                 'deliveryToken' => $delivery['token'],
             ];

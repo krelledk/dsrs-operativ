@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=11">
+  <link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
   <div class="shell">
@@ -183,6 +183,13 @@
                 <span class="eyebrow">DIN BEREDSKABSSTATUS</span>
                 <div class="availability-row"><span>Næste 12 timer</span><b><span class="status-dot online"></span> Klar til udrykning</b></div>
               </section>
+              <section class="app-card sound-card">
+                <span class="eyebrow">ALARMERING</span>
+                <div class="sound-row">
+                  <div><b>Alarmlyd og vibration</b><small id="sound-status">Klargør alarmlyden på denne enhed.</small></div>
+                  <button id="sound-test-button" type="button">Test lyd</button>
+                </div>
+              </section>
               <section class="app-card">
                 <span class="eyebrow">SENESTE HÆNDELSER</span>
                 <div id="mobile-history"></div>
@@ -292,6 +299,6 @@
       <button class="primary-button" type="submit">Registrer og aktivér push</button>
     </form>
   </dialog>
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>

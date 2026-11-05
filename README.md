@@ -1,16 +1,18 @@
 # DSRS Operativ MVP
 
-En buildless statisk prototype til Dansk Søredningsselskab med tre visninger:
+En buildless pilot til Dansk Søredningsselskab med kontrolcentral, installerbar besætnings-PWA og PHP/SQLite-backend:
 
 - SAR-kontrolcentral til at oprette og udsende maritime alarmer med leveringskvitteringer.
-- Installerbar besætnings-PWA med position, situationsmelding, lokal browsernotifikation og valget Accepteret / Ej accepteret.
+- Installerbar besætnings-PWA med Web Push, systemlyd/vibration, SAR-tone, position, situationsmelding og valget Accepteret / Ej accepteret.
 - Projektmapping fra prototype til robust, integreret alarmplatform.
 
-## Demoens tekniske afgrænsning
+## Pilotens tekniske afgrænsning
 
-Alarmdeling mellem faner bruger `localStorage` og `BroadcastChannel`. Det er en interaktionsprototype, ikke en produktionsklar alarmeringskanal. Fjern-push på tværs af enheder kræver backend, bruger-/enhedsregistrering og APNs/FCM eller en valgt pushleverandør.
+Fjern-push, enhedsregistrering og kvitteringer kører via pilotbackenden på Simply. `localStorage` og `BroadcastChannel` bevares som lokal demo/fallback. Løsningen er fortsat en pilot og må ikke stå alene som operativ alarmeringskanal, før redundans, overvågning, adgangsstyring og SMS/telefon-fallback er etableret.
 
-Planlagt produktionsdomæne: `alarm.hansenlabs.dk`.
+Pilotdomæne: `https://alarm.hansenlabs.dk`.
+
+Se [mobil-, web- og pushkompatibilitet](docs/MOBILE-AND-PUSH-COMPATIBILITY.md).
 
 ## Ejerskab og versionering
 

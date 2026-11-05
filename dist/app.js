@@ -14,11 +14,22 @@ let csrfToken=null;
 let remoteDeliveries=null;
 let pendingDispatch=null;
 let serviceWorkerRegistrationPromise=null;
+let alarmAudioContext=null;
+let alarmOscillator=null;
+let alarmGain=null;
+let alarmSoundTimer=null;
 
 function withTimeout(promise,milliseconds,message){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error(message)),milliseconds);Promise.resolve(promise).then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)})})}
 function setDeviceStatus(message,state=''){const status=document.querySelector('#device-status');if(!status)return;status.textContent=message;status.className=`device-status${state?' '+state:''}`}
 function ensureServiceWorker(){if(!('serviceWorker'in navigator))return Promise.reject(new Error('Denne browser understøtter ikke appens push-service.'));if(!serviceWorkerRegistrationPromise)serviceWorkerRegistrationPromise=navigator.serviceWorker.register('service-worker.js',{scope:'./'}).then(registration=>{if(registration.waiting)registration.waiting.postMessage({type:'SKIP_WAITING'});return navigator.serviceWorker.ready});return withTimeout(serviceWorkerRegistrationPromise,15000,'Appens push-service svarede ikke. Luk appen helt, åbn den igen, og prøv på ny.')}
 function requestNotificationPermission(){if(Notification.permission!=='default')return Promise.resolve(Notification.permission);return withTimeout(new Promise((resolve,reject)=>{let settled=false;const finish=value=>{if(settled)return;settled=true;resolve(value||Notification.permission)};try{const result=Notification.requestPermission(finish);if(result&&typeof result.then==='function')result.then(finish,reject)}catch(error){reject(error)}}),45000,'Telefonens spørgsmål om notifikationer blev ikke besvaret. Prøv igen, og vælg Tillad i telefonens dialog.')}
+function soundStatus(message,ready=false){const status=document.querySelector('#sound-status');if(status)status.textContent=message;const button=document.querySelector('#sound-test-button');if(button)button.classList.toggle('testing',ready)}
+function audioContext(){const Context=window.AudioContext||window.webkitAudioContext;if(!Context)return null;if(!alarmAudioContext)alarmAudioContext=new Context();return alarmAudioContext}
+async function primeAlarmSound(){const context=audioContext();if(!context){soundStatus('Denne browser bruger kun telefonens systemlyd.');return false}try{if(context.state==='suspended')await context.resume();const ready=context.state==='running';soundStatus(ready?'Alarmlyd er klar · Telefonens lydløs/Fokus kan overstyre baggrundslyd.':'Tryk Test lyd for at klargøre alarmlyden.',ready);return ready}catch{soundStatus('Tryk Test lyd for at klargøre alarmlyden.');return false}}
+function stopAlarmSound(){clearTimeout(alarmSoundTimer);alarmSoundTimer=null;if(alarmOscillator){try{alarmOscillator.stop()}catch{}alarmOscillator.disconnect();alarmOscillator=null}if(alarmGain){alarmGain.disconnect();alarmGain=null}navigator.vibrate?.(0)}
+async function startAlarmSound(test=false){if(!await primeAlarmSound())return false;stopAlarmSound();const context=audioContext();const duration=test?4.8:24;const start=context.currentTime+.03;const oscillator=context.createOscillator();const gain=context.createGain();oscillator.type='sine';oscillator.connect(gain);gain.connect(context.destination);gain.gain.setValueAtTime(.0001,start);for(let offset=0;offset<duration;offset+=.48){oscillator.frequency.setValueAtTime((Math.floor(offset/.48)%2===0)?720:940,start+offset);gain.gain.setValueAtTime(.0001,start+offset);gain.gain.exponentialRampToValueAtTime(.18,start+offset+.06);gain.gain.setValueAtTime(.18,start+offset+.30);gain.gain.exponentialRampToValueAtTime(.0001,start+offset+.44)}oscillator.start(start);oscillator.stop(start+duration);alarmOscillator=oscillator;alarmGain=gain;navigator.vibrate?.(test?[350,150,350]:[700,220,700,220,1100,300,700]);alarmSoundTimer=setTimeout(()=>{stopAlarmSound();soundStatus('Alarmlyd er klar · Telefonens lydløs/Fokus kan overstyre baggrundslyd.',true)},duration*1000+200);soundStatus(test?'Alarmlyden afspilles nu.':'SAR-alarmlyd aktiv.',true);return true}
+function startAlarmSoundOnce(alarm){if(!alarm?.id||sessionStorage.getItem('dsrs.lastSoundAlarm.v1')===alarm.id)return;sessionStorage.setItem('dsrs.lastSoundAlarm.v1',alarm.id);startAlarmSound(false)}
+function clearAppBadge(){const result=navigator.clearAppBadge?.();result?.catch?.(()=>null)}
 
 function read(key, fallback){ try{return JSON.parse(localStorage.getItem(key)) ?? fallback}catch{return fallback} }
 function write(key,value){localStorage.setItem(key,JSON.stringify(value))}
@@ -60,7 +71,7 @@ function renderDelivery(){
 
 function notify(alarm){
   if(!('Notification'in window)||Notification.permission!=='granted')return false;
-  const title=`DSRS SAR-ALARM · ${alarm.type}`; const options={body:`${alarm.location}\n${alarm.message}`,icon:'icon-192.png',badge:'icon-192.png',tag:alarm.id,renotify:true,data:{url:location.origin+location.pathname+'#responder'}};
+  const title=`DSRS SAR-ALARM · ${alarm.type}`; const options={body:`${alarm.location}\n${alarm.message}`,icon:'icon-192.png',badge:'icon-192.png',tag:alarm.id,renotify:true,requireInteraction:true,silent:false,vibrate:[700,220,700,220,1100],timestamp:Date.now(),data:{url:location.origin+location.pathname+'#responder?alert=1'}};
   if(navigator.serviceWorker?.controller)navigator.serviceWorker.controller.postMessage({type:'SHOW_ALARM',title,options});
   else new Notification(title,options);
   return true;
@@ -73,7 +84,7 @@ function receiveAlarm(alarm){
     if(!delivery.notificationShownAt&&notify(alarm)){delivery.notificationShownAt=new Date().toISOString();addLog('Mandskabsappen kvitterede for afsendt/vis notifikation.')}
     write(STORAGE.delivery,delivery);channel?.postMessage({type:'delivery',delivery});
   }
-  renderAlarm();showToast(`Ny alarm modtaget: ${alarm.type}`)
+  renderAlarm();startAlarmSoundOnce(alarm);showToast(`Ny alarm modtaget: ${alarm.type}`)
 }
 
 function collectAlarm(){const units=[...document.querySelectorAll('.unit-picker input:checked')].map(x=>x.value);if(!units.length)throw new Error('Vælg mindst én enhed.');return {type:document.querySelector('#alarm-type').value,priority:document.querySelector('#alarm-priority').value,location:document.querySelector('#alarm-location').value.trim(),message:document.querySelector('#alarm-message').value.trim(),units}}
@@ -85,10 +96,11 @@ async function sendAlarm(event){
   if(backendOnline){if(!csrfToken){pendingDispatch=data;document.querySelector('#admin-dialog').showModal();return}await dispatchRemote(data);return}
   const alarm={id:crypto.randomUUID?.()||String(Date.now()),...data,createdAt:new Date().toISOString()};
   const now=new Date().toISOString();const alarms=read(STORAGE.alarms,[]);alarms.unshift(alarm);write(STORAGE.alarms,alarms.slice(0,30));write(STORAGE.delivery,{alarmId:alarm.id,createdAt:alarm.createdAt,pushSentAt:now,appReceivedAt:null,notificationShownAt:null});write(STORAGE.current,alarm);write(STORAGE.responses,Object.fromEntries(crew.map(x=>[x[1],'wait'])));
-  addLog(`Alarm udsendt: ${alarm.type} til ${units.join(', ')}.`);channel?.postMessage({type:'alarm',alarm});renderAlarm();showToast(`Alarm udsendt til ${document.querySelector('#recipient-count').textContent} modtagere.`)
+  addLog(`Alarm udsendt: ${alarm.type} til ${data.units.join(', ')}.`);channel?.postMessage({type:'alarm',alarm});renderAlarm();showToast(`Alarm udsendt til ${document.querySelector('#recipient-count').textContent} modtagere.`)
 }
 
 async function respond(status){
+  stopAlarmSound();soundStatus('Alarmlyd er klar · Telefonens lydløs/Fokus kan overstyre baggrundslyd.',true);clearAppBadge();
   const labels={accepted:'Accepteret',rejected:'Ej accepteret'};const responses=currentResponses();responses['Maja Andersen']=status;write(STORAGE.responses,responses);addLog(`Maja Andersen svarede: ${labels[status]}.`);channel?.postMessage({type:'response',status,name:'Maja Andersen'});renderAlarm();const box=document.querySelector('#response-confirmation');box.hidden=false;box.textContent=`Svar registreret · ${labels[status]}`;showToast('Din kvittering er sendt til kontrolcentralen.')
   const alarm=currentAlarm();if(alarm.deliveryToken)try{await api('receipt',{method:'POST',body:{deliveryToken:alarm.deliveryToken,stage:'response',response:status}})}catch(error){showToast(`Svaret kunne ikke sendes: ${error.message}`,true)}
 }
@@ -133,7 +145,7 @@ async function registerDevice(crewName,stationCode){
   const result=await withTimeout(api('subscribe',{method:'POST',body:{stationCode,crewName,deviceId,subscription:subscription.toJSON()}}),15000,'DSRS-serveren svarede ikke. Kontrollér internetforbindelsen, og prøv igen.');
   localStorage.setItem(DEVICE.token,result.deviceToken);localStorage.setItem(DEVICE.name,result.crewName);updateMobileIdentity();document.querySelector('#notification-button').textContent='Pushnotifikationer aktiveret';setDeviceStatus('Telefonen er registreret, og pushnotifikationer er aktiveret.','success');showToast('Denne telefon er registreret til DSRS SAR.');await loadCurrentAlarm()
 }
-async function loadCurrentAlarm(){const token=localStorage.getItem(DEVICE.token);if(!token||!backendOnline)return;try{const result=await api('current',{token});if(result.alarm){write(STORAGE.current,result.alarm);write(STORAGE.delivery,{alarmId:result.alarm.id,createdAt:result.alarm.createdAt,pushSentAt:result.delivery?.pushSentAt,appReceivedAt:result.delivery?.appReceivedAt,notificationShownAt:result.delivery?.notificationShownAt});renderAlarm()}}catch(error){if(/token/i.test(error.message)){localStorage.removeItem(DEVICE.token);document.querySelector('#notification-button').textContent='Aktivér pushnotifikationer'}}}
+async function loadCurrentAlarm(soundOnNew=false){const token=localStorage.getItem(DEVICE.token);if(!token||!backendOnline)return;const previousId=currentAlarm()?.id;try{const result=await api('current',{token});if(result.alarm){const isNew=previousId!==result.alarm.id;write(STORAGE.current,result.alarm);write(STORAGE.delivery,{alarmId:result.alarm.id,createdAt:result.alarm.createdAt,pushSentAt:result.delivery?.pushSentAt,appReceivedAt:result.delivery?.appReceivedAt,notificationShownAt:result.delivery?.notificationShownAt});renderAlarm();if(isNew&&soundOnNew){api('receipt',{method:'POST',body:{deliveryToken:result.alarm.deliveryToken,stage:'received'}}).catch(()=>null);if(notify(result.alarm))api('receipt',{method:'POST',body:{deliveryToken:result.alarm.deliveryToken,stage:'shown'}}).catch(()=>null)}if((isNew&&soundOnNew)||/(?:\?|&)alert=1(?:&|$)/.test(location.hash))startAlarmSoundOnce(result.alarm)}}catch(error){if(/token/i.test(error.message)){localStorage.removeItem(DEVICE.token);document.querySelector('#notification-button').textContent='Aktivér pushnotifikationer'}}}
 async function pollRemoteStatus(){if(!backendOnline||!csrfToken)return;try{const result=await api('status');if(result.alarm){write(STORAGE.current,result.alarm);remoteDeliveries=result.deliveries;const first=key=>result.deliveries.map(item=>item[key]).filter(Boolean).sort()[0]||null;write(STORAGE.delivery,{alarmId:result.alarm.id,createdAt:result.alarm.createdAt,pushSentAt:first('push_sent_at'),appReceivedAt:first('app_received_at'),notificationShownAt:first('notification_shown_at')});renderAlarm()}}catch(error){if(/login/i.test(error.message))csrfToken=null}}
 async function initialiseBackend(){try{backendConfig=await api('config');backendOnline=true;const session=await api('session');csrfToken=session.authenticated?session.csrfToken:null;if(localStorage.getItem(DEVICE.token)){document.querySelector('#notification-button').textContent='Pushnotifikationer aktiveret';loadCurrentAlarm()}if(csrfToken)pollRemoteStatus()}catch{backendOnline=false}}
 
@@ -189,13 +201,15 @@ document.querySelector('#alarm-form').addEventListener('submit',sendAlarm);
 document.querySelectorAll('.unit-picker input').forEach(x=>x.addEventListener('change',updateRecipients));
 document.querySelectorAll('[data-response]').forEach(x=>x.addEventListener('click',()=>respond(x.dataset.response)));
 document.querySelector('#notification-button').addEventListener('click',enableNotifications);
+document.querySelector('#sound-test-button').addEventListener('click',()=>startAlarmSound(true));
 document.querySelector('#new-tab-button').addEventListener('click',()=>window.open(location.origin+location.pathname+'#responder','alarmberedskab-app'));
 document.querySelector('#open-app-button').addEventListener('click',()=>location.hash='responder');
 document.querySelector('.menu-button').addEventListener('click',()=>document.querySelector('.sidebar').classList.toggle('open'));
 document.querySelector('#clear-demo').addEventListener('click',()=>{Object.values(STORAGE).forEach(k=>localStorage.removeItem(k));ensureSeed();renderAlarm();renderLog();showToast('Demoen er nulstillet.')});
 document.querySelector('#admin-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{const result=await api('login',{method:'POST',body:{code:document.querySelector('#admin-code').value}});csrfToken=result.csrfToken;document.querySelector('#admin-code').value='';document.querySelector('#admin-dialog').close();showToast('Kontrolcentralen er logget ind.');if(pendingDispatch){const alarm=pendingDispatch;pendingDispatch=null;await dispatchRemote(alarm)}else pollRemoteStatus()}catch(error){showToast(error.message,true)}finally{button.disabled=false}});
-document.querySelector('#device-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter||event.currentTarget.querySelector('[type="submit"]');const originalLabel=button.textContent;button.disabled=true;button.textContent='Aktiverer push …';try{await registerDevice(document.querySelector('#crew-name').value.trim(),document.querySelector('#station-code').value);document.querySelector('#station-code').value='';setTimeout(()=>document.querySelector('#device-dialog').close(),900)}catch(error){const message=error?.message||'Telefonen kunne ikke registreres.';setDeviceStatus(message,'error');showToast(message,true)}finally{button.disabled=false;button.textContent=originalLabel}});
+document.querySelector('#device-form').addEventListener('submit',async event=>{event.preventDefault();primeAlarmSound();const button=event.submitter||event.currentTarget.querySelector('[type="submit"]');const originalLabel=button.textContent;button.disabled=true;button.textContent='Aktiverer push …';try{await registerDevice(document.querySelector('#crew-name').value.trim(),document.querySelector('#station-code').value);document.querySelector('#station-code').value='';setTimeout(()=>document.querySelector('#device-dialog').close(),900)}catch(error){const message=error?.message||'Telefonen kunne ikke registreres.';setDeviceStatus(message,'error');showToast(message,true)}finally{button.disabled=false;button.textContent=originalLabel}});
 document.querySelector('#device-dialog-close').addEventListener('click',()=>document.querySelector('#device-dialog').close());
+document.addEventListener('pointerdown',()=>primeAlarmSound(),{once:true,capture:true});
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'&&location.hash!=='#responder')document.querySelector('#alarm-form').requestSubmit()});
 function updateClocks(){const now=new Date();document.querySelector('#clock').textContent=new Intl.DateTimeFormat('da-DK',{hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(now);document.querySelector('#mobile-clock').textContent=new Intl.DateTimeFormat('da-DK',{hour:'2-digit',minute:'2-digit'}).format(now)}
 updateClocks();setInterval(updateClocks,1000);
@@ -204,6 +218,7 @@ window.addEventListener('appinstalled',()=>{deferredPrompt=null;updateInstallUI(
 document.querySelector('#install-button').addEventListener('click',installApp);
 updateInstallUI();
 if('serviceWorker'in navigator)ensureServiceWorker().catch(()=>showToast('Appens offline-funktion kunne ikke startes.',true));
-navigator.serviceWorker?.addEventListener('message',event=>{if(event.data?.type==='push-alarm'&&event.data.payload?.alarm){const alarm={...event.data.payload.alarm,deliveryToken:event.data.payload.deliveryToken};write(STORAGE.current,alarm);write(STORAGE.delivery,{alarmId:alarm.id,createdAt:alarm.createdAt,pushSentAt:new Date().toISOString(),appReceivedAt:new Date().toISOString(),notificationShownAt:new Date().toISOString()});renderAlarm();showToast(`Ny SAR-alarm: ${alarm.type}`)}});
+navigator.serviceWorker?.addEventListener('message',event=>{if(event.data?.type==='push-alarm'&&event.data.payload?.alarm){const alarm={...event.data.payload.alarm,deliveryToken:event.data.payload.deliveryToken};write(STORAGE.current,alarm);write(STORAGE.delivery,{alarmId:alarm.id,createdAt:alarm.createdAt,pushSentAt:new Date().toISOString(),appReceivedAt:new Date().toISOString(),notificationShownAt:new Date().toISOString()});renderAlarm();startAlarmSoundOnce(alarm);showToast(`Ny SAR-alarm: ${alarm.type}`)}});
 initialiseBackend();
 setInterval(()=>{if((location.hash||'#control').startsWith('#control'))pollRemoteStatus()},3000);
+setInterval(()=>{if((location.hash||'').startsWith('#responder'))loadCurrentAlarm(true)},15000);

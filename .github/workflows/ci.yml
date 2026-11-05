@@ -20,3 +20,13 @@ jobs:
           node-version: 22
       - name: Validate static application
         run: npm run check
+      - name: Use PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+      - name: Validate backend dependencies
+        working-directory: server
+        run: |
+          composer validate --no-check-publish
+          composer audit --locked --no-dev

@@ -1,5 +1,5 @@
-const CACHE='dsrs-operativ-v11';
-const APP_SHELL=['./','index.html','styles.css?v=11','app.js?v=11','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
+const CACHE='dsrs-operativ-v12';
+const APP_SHELL=['./','index.html','styles.css?v=12','app.js?v=12','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
 
 self.addEventListener('install',event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting())
@@ -30,7 +30,8 @@ self.addEventListener('push',event=>{
   event.waitUntil((async()=>{
     const receipt=stage=>payload.deliveryToken?fetch('api/index.php?action=receipt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deliveryToken:payload.deliveryToken,stage})}).catch(()=>null):Promise.resolve();
     await receipt('received');
-    await self.registration.showNotification(payload.title,{body:payload.body,icon:'icon-192.png',badge:'icon-192.png',tag:payload.tag||'dsrs-sar-alarm',renotify:true,requireInteraction:true,data:{url:payload.url||'./#responder'}});
+    await self.registration.showNotification(payload.title,{body:payload.body,icon:'icon-192.png',badge:'icon-192.png',tag:payload.tag||'dsrs-sar-alarm',renotify:true,requireInteraction:true,silent:false,vibrate:[700,220,700,220,1100],timestamp:Date.now(),data:{url:payload.url||'./#responder'}});
+    if('setAppBadge'in self.registration)await self.registration.setAppBadge(1).catch(()=>null);
     await receipt('shown');
     const windows=await clients.matchAll({type:'window',includeUncontrolled:true});for(const client of windows)client.postMessage({type:'push-alarm',payload});
   })());

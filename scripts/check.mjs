@@ -11,6 +11,7 @@ const required = [
   'server/setup.php',
   'server/composer.json',
   'server/composer.lock',
+  'docs/MOBILE-AND-PUSH-COMPATIBILITY.md',
   'dist/icon.svg',
   'dist/icon-192.png',
   'dist/icon-512.png',
@@ -22,6 +23,8 @@ await Promise.all(required.map((file) => access(file)));
 const hosting = JSON.parse(await readFile('.openai/hosting.json', 'utf8'));
 const manifest = JSON.parse(await readFile('dist/manifest.webmanifest', 'utf8'));
 const html = await readFile('dist/index.html', 'utf8');
+const app = await readFile('dist/app.js', 'utf8');
+const serviceWorker = await readFile('dist/service-worker.js', 'utf8');
 
 if (hosting.static?.directory !== 'dist') throw new Error('Hosting skal pege på dist/.');
 if (!manifest.name?.includes('DSRS')) throw new Error('PWA-navnet mangler DSRS.');
@@ -31,8 +34,14 @@ for (const size of ['192x192', '512x512']) {
   if (!manifest.icons?.some((icon) => icon.sizes === size && icon.type === 'image/png')) throw new Error(`PWA-ikon mangler: ${size}`);
 }
 if (!manifest.icons?.some((icon) => icon.purpose === 'maskable')) throw new Error('Maskable PWA-ikon mangler.');
-for (const marker of ['DSRS', 'SAR kontrolcentral', 'Accepteret', 'Ej accepteret']) {
+for (const marker of ['DSRS', 'SAR kontrolcentral', 'Accepteret', 'Ej accepteret', 'Test lyd']) {
   if (!html.includes(marker)) throw new Error(`Påkrævet UI-markør mangler: ${marker}`);
+}
+for (const marker of ['startAlarmSound', 'primeAlarmSound', 'loadCurrentAlarm(true)']) {
+  if (!app.includes(marker)) throw new Error(`Alarmlyd/fallback mangler: ${marker}`);
+}
+for (const marker of ['silent:false', 'vibrate:', 'setAppBadge']) {
+  if (!serviceWorker.includes(marker)) throw new Error(`Push-alarmering mangler: ${marker}`);
 }
 
 console.log('DSRS Operativ: statiske checks bestået.');

@@ -1,14 +1,16 @@
 # Infrastruktur og miljøer
 
-## Nuværende prototype
+## Nuværende pilot
 
-- Privat Sites-deployment til produkt- og flowvalidering.
-- Planlagt DNS-navn: `alarm.hansenlabs.dk`.
-- Ingen produktionsbackend eller operativ pushgateway endnu.
+- Frontend/PWA: `https://alarm.hansenlabs.dk` på Simply.
+- Backend: PHP 8.5, SQLite og standardsbaseret Web Push.
+- Backendafhængigheder og runtime-data ligger uden for subdomænets webroot.
+- TLS er aktivt på pilotdomænet.
+- Et privat Sites-deployment kan fortsat bruges som designfallback.
 
 ## Hansen Labs-server
 
-Der findes SSH-adgang via en privat PEM-nøgle. En skrivebeskyttet inventering blev gennemført 4. november 2026 uden deployment eller filændringer på serveren.
+Der findes SSH-adgang via en privat PEM-nøgle. Pilotfrontend og backend blev deployet 4. november 2026.
 
 ### Bekræftet inventar
 
@@ -22,7 +24,7 @@ Der findes SSH-adgang via en privat PEM-nøgle. En skrivebeskyttet inventering b
 - Eksisterende mapper omfatter `public_html`, `hansenlabs-staging-app` og `Dev-dsrs`.
 - `Dev-dsrs` ligner en eksisterende Drupal-kodebase og er ikke ændret.
 
-Før deployment skal følgende stadig fastlægges:
+Før operativ produktion skal følgende stadig fastlægges:
 
 - Serverens ejer og ansvarlige driftskontakt.
 - Operativsystem, patchniveau og backupstatus.
@@ -31,7 +33,7 @@ Før deployment skal følgende stadig fastlægges:
 
 PEM-filen må ikke lægges i repositoryet, kopieres til en server uden behov eller deles via chat/e-mail. Ved overdragelse bør den erstattes af en DSRS-ejet deployidentitet med roterbar nøgle og mindst mulige rettigheder.
 
-Der er ikke deployet til `public_html`, `Dev-dsrs` eller andre mapper som led i inventeringen.
+Piloten er deployet til subdomænets mappe `/var/www/hansenlabs.dk/alarm`. Eksisterende `public_html` og `Dev-dsrs` er ikke ændret.
 
 ## Foreslåede miljøer
 
