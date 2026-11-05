@@ -1,5 +1,5 @@
-const CACHE='dsrs-operativ-v16';
-const APP_SHELL=['./','index.html','styles.css?v=16','app.js?v=16','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
+const CACHE='dsrs-operativ-v17';
+const APP_SHELL=['./','index.html','styles.css?v=17','app.js?v=17','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
 
 self.addEventListener('install',event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting())

@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=16">
+  <link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
   <div class="shell">
@@ -52,7 +52,7 @@
         </div>
         <div class="topbar-actions">
           <span class="clock" id="clock">--:--:--</span>
-          <span class="station-chip"><i></i> STATION KØGE</span>
+          <span class="station-chip"><i></i> <span id="station-chip-label">STATION KØGE</span></span>
           <button class="ghost-button" id="open-app-button"><span>↗</span> Åbn besætningsapp</button>
         </div>
       </header>
@@ -109,6 +109,12 @@
                   </select>
                 </label>
               </div>
+              <label>Ansvarlig redningsstation
+                <select id="dispatch-station" required aria-describedby="dispatch-station-help">
+                  <option value="station-koege">DSRS Køge</option>
+                </select>
+                <small id="dispatch-station-help" class="field-help">Alarmen sendes kun til den valgte stations registrerede enheder.</small>
+              </label>
               <label>Position / farvand
                 <div class="input-with-icon"><span>⌖</span><input id="alarm-location" required value="55°27.90'N · 12°12.45'E · Køge Bugt"></div>
               </label>
@@ -117,7 +123,7 @@
               </label>
               <fieldset>
                 <legend>Alarmér station og enheder</legend>
-                <div class="unit-picker">
+                <div class="unit-picker" id="unit-picker">
                   <label><input type="checkbox" value="RS Køge" checked><span><b>RS</b><em>RS Køge</em><small>4 personer</small></span></label>
                   <label><input type="checkbox" value="RHIB 01" checked><span><b>01</b><em>RHIB 01</em><small>2 personer</small></span></label>
                   <label><input type="checkbox" value="Stationsleder"><span><b>SL</b><em>Stationsleder</em><small>1 person</small></span></label>
@@ -175,7 +181,7 @@
               <span class="avatar" id="mobile-avatar" aria-label="Registreret besætning">MA</span>
             </div>
             <div class="app-body">
-              <div class="app-state"><span class="status-dot online"></span> Station Køge · Du er i beredskab</div>
+              <div class="app-state" id="mobile-station-status"><span class="status-dot online"></span> Station Køge · Du er i beredskab</div>
               <article class="mobile-alarm" id="mobile-alarm"></article>
               <div class="app-actions" id="response-actions">
                 <button data-response="accepted" class="yes">✓<span>ACCEPTERET</span></button>
@@ -332,11 +338,16 @@
       <h2 id="device-dialog-title">Tilknyt denne telefon</h2>
       <p class="dialog-copy">Navnet vises i kontrolcentralens kvitteringsliste.</p>
       <label>Navn<input id="crew-name" required maxlength="80" autocomplete="name" value="Maja Andersen"></label>
+      <label>Redningsstation
+        <select id="device-station" required>
+          <option value="station-koege">DSRS Køge</option>
+        </select>
+      </label>
       <label>Stationskode<input id="station-code" type="password" required minlength="8" autocomplete="one-time-code" autocapitalize="none" spellcheck="false"></label>
       <p id="device-status" class="device-status" role="status" aria-live="polite">Tryk på knappen, og godkend derefter telefonens spørgsmål om notifikationer.</p>
       <button class="primary-button" type="submit">Registrer og aktivér push</button>
     </form>
   </dialog>
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

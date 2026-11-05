@@ -13,6 +13,7 @@ const required = [
   'server/composer.lock',
   'docs/MOBILE-AND-PUSH-COMPATIBILITY.md',
   'docs/PRODUCT-BENCHMARK-AND-ROADMAP.md',
+  'docs/PHASE-1-MULTI-STATION-FOUNDATION.md',
   'dist/icon.svg',
   'dist/icon-192.png',
   'dist/icon-512.png',
@@ -42,7 +43,7 @@ for (const marker of ['startAlarmSound', 'primeAlarmSound', 'createAlarmWav', 'c
   if (!app.includes(marker)) throw new Error(`Alarmlyd/fallback mangler: ${marker}`);
 }
 const api = await readFile('dist/api/index.php', 'utf8');
-for (const marker of ["$action === 'complete'", 'completed_at IS NULL', 'alarm_completed', "completed_by='superseded'"]) {
+for (const marker of ["$action === 'complete'", 'completed_at IS NULL', 'alarm_completed', "completed_by='superseded'", 'station_id', 'publicStations', 'vessel_ids_json', 'station-faxe-ladeplads']) {
   if (!api.includes(marker)) throw new Error(`Alarm-afslutning mangler: ${marker}`);
 }
 for (const marker of ['silent:false', 'vibrate:', 'setAppBadge']) {

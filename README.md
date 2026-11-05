@@ -17,6 +17,8 @@ Pilotdomæne: `https://alarm.hansenlabs.dk`.
 
 Se [mobil-, web- og pushkompatibilitet](docs/MOBILE-AND-PUSH-COMPATIBILITY.md) og den samlede [produktbenchmark, maritime funktionskortlægning og roadmap](docs/PRODUCT-BENCHMARK-AND-ROADMAP.md).
 
+Fase 1 er påbegyndt med det [bagudkompatible multi-station- og fartøjsfundament](docs/PHASE-1-MULTI-STATION-FOUNDATION.md).
+
 ## Ejerskab og versionering
 
 Projektet er gjort klar til et privat DSRS-ejet Git-repository med CI-validering og eksplicit udelukkelse af PEM-filer og andre hemmeligheder. Se [docs/OWNERSHIP-AND-HANDOVER.md](docs/OWNERSHIP-AND-HANDOVER.md).
