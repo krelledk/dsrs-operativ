@@ -1,6 +1,6 @@
 # Fase 1A — multi-station- og fartøjsfundament
 
-**Version:** 0.8.1
+**Version:** 0.8.2
 **Dato:** 5. november 2026
 
 ## Leveret i denne del
@@ -41,6 +41,10 @@ Fartøjsvalget er i denne første del metadata for hændelsen. Push målrettes s
 ## Driftshærdning 0.8.1
 
 Hvis Android/iOS-pushtjenesten erklærer et abonnement udløbet, markerer serveren det fortsat inaktivt. Appen kan nu genkende den ugyldige enhedstoken, fjerne den udløbne browserforbindelse og oprette en ny med den eksisterende, stationsbundne enhedsidentitet. En genregistreret app henter desuden straks stationens aktive alarm, også når alarmen blev oprettet, mens telefonen var afkoblet.
+
+## Mobil onboarding 0.8.2
+
+Den installerede app viser nu enhedens parringsstatus og handlingen **Par denne mobil** direkte i alarmvisningen. En mobil uden gyldig registrering rydder en tidligere lokal demo- eller testalarm, så den ikke fejlagtigt fremstår som en aktiv serveralarm.
 
 ## Næste del
 

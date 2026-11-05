@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=18">
+  <link rel="stylesheet" href="styles.css?v=19">
 </head>
 <body>
   <div class="shell">
@@ -182,6 +182,10 @@
             </div>
             <div class="app-body">
               <div class="app-state" id="mobile-station-status"><span class="status-dot online"></span> Station Køge · Du er i beredskab</div>
+              <section class="app-card mobile-pairing-card" id="mobile-pairing-card">
+                <div class="mobile-pairing-copy"><span class="eyebrow">DENNE ENHED</span><b id="mobile-pairing-title">Mobilen er ikke parret</b><small id="mobile-pairing-status">Par mobilen for at modtage SAR-alarmer og sende kvitteringer.</small></div>
+                <button id="mobile-pairing-button" data-notification-action type="button">Par denne mobil</button>
+              </section>
               <article class="mobile-alarm" id="mobile-alarm"></article>
               <div class="app-actions" id="response-actions">
                 <button data-response="accepted" class="yes">✓<span>ACCEPTERET</span></button>
@@ -216,7 +220,7 @@
               <div><span>2</span><p><b>Tillad notifikationer</b><small>Giv samtykke fra den installerede app.</small></p></div>
               <div><span>3</span><p><b>Send og kvittér</b><small>Modtaget, notifikation vist og dit svar vises live i kontrolcentralen.</small></p></div>
             </div>
-            <button id="notification-button" class="primary-button">Aktivér pushnotifikationer</button>
+            <button id="notification-button" data-notification-action class="primary-button">Aktivér pushnotifikationer</button>
             <button id="install-button" class="secondary-button">Installer DSRS SAR</button>
             <p id="install-status" class="install-status" aria-live="polite"></p>
             <button id="new-tab-button" class="secondary-button">Åbn app i ny fane</button>
@@ -348,6 +352,6 @@
       <button class="primary-button" type="submit">Registrer og aktivér push</button>
     </form>
   </dialog>
-<script src="app.js?v=18"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>
