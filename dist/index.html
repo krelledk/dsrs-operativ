@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=14">
+  <link rel="stylesheet" href="styles.css?v=15">
 </head>
 <body>
   <div class="shell">
@@ -221,49 +221,84 @@
 
       <section class="view" id="roadmap-view" data-view="roadmap">
         <div class="roadmap-hero">
-          <div><span class="eyebrow">DSRS · FRA MVP TIL DRIFT</span><h2>Udviklingsplan</h2><p>En trinvis vej fra lokal prototype til en robust operativ platform for frivillig søredning.</p></div>
-          <div class="roadmap-status"><span>NU</span><b>Fase 0 · Koncept & prototype</b><small>Kontrolcentral + modtagerflow</small></div>
+          <div><span class="eyebrow">BENCHMARK · FIRE SERVICE ROTA · ALARM DISPATCHER · MARITIM SAR</span><h2>Fra alarm til sikker afgang</h2><p>En DSRS-specifik produktplan bygget omkring beredskab, mobilisering, maritim mission og læring.</p></div>
+          <div class="roadmap-status"><span>NU</span><b>Fase 0 · Prototype-hærdning</b><small>Næste gate: 50 dokumenterede testalarmer</small></div>
+        </div>
+
+        <div class="product-pillars" aria-label="Fire operative produktspor">
+          <article><span>01</span><div><b>Beredskab</b><small>Vagt, roller og kvalificeret fartøjscrew</small></div></article>
+          <article><span>02</span><div><b>Mobilisering</b><small>Levering, kvittering, ETA og eskalation</small></div></article>
+          <article><span>03</span><div><b>Maritim mission</b><small>Position, vejr, fartøj og operativ tidslinje</small></div></article>
+          <article><span>04</span><div><b>Afslutning</b><small>Genmelding, rapport, debrief og læring</small></div></article>
         </div>
 
         <div class="phase-grid">
-          <article class="phase current"><span class="phase-no">00</span><small>NU · 1–2 UGER</small><h3>Prototype</h3><p>Validér operatørflow, alarmdata, kvittering og mobiloplevelse.</p><ul><li>Kontrolcentral-web</li><li>Installerbar PWA</li><li>Lokal push-demo</li><li>Domænemodel og backlog</li></ul></article>
-          <article class="phase"><span class="phase-no">01</span><small>3–5 UGER</small><h3>Teknisk MVP</h3><p>Rigtige brugere, enheder og fjern-push på tværs af telefoner.</p><ul><li>API + database</li><li>Login, roller og organisationer</li><li>FCM / APNs push</li><li>Auditlog og basisdrift</li></ul></article>
-          <article class="phase"><span class="phase-no">02</span><small>4–8 UGER</small><h3>Pilotdrift</h3><p>Test med én organisation, vagtplaner og realistiske beredskabsflows.</p><ul><li>Vagt og tilgængelighed</li><li>Eskaleringsregler</li><li>Offline og redundans</li><li>Overvågning og support</li></ul></article>
-          <article class="phase"><span class="phase-no">03</span><small>LØBENDE</small><h3>Platform</h3><p>Integrationer, rapportering og skalering til flere organisationer.</p><ul><li>CAD/API-integrationer</li><li>Rapporter og BI</li><li>Stationsskærme</li><li>Multi-tenant og SLA</li></ul></article>
+          <article class="phase current"><span class="phase-no">00</span><small>NU–4 UGER</small><h3>Prototype-hærdning</h3><p>Bevis hele alarmkæden på én station og alle relevante mobilstørrelser.</p><ul><li>Push, lyd, svar og afslutning</li><li>Enheds- og fejltest</li><li>Basis auditlog</li><li>Operatørtest i Køge</li></ul></article>
+          <article class="phase"><span class="phase-no">01</span><small>1–3 MÅNEDER</small><h3>Pilot-sikker alarm</h3><p>Gør leveringskæden, ansvaret og kvalificeret bemanding entydig.</p><ul><li>Login, roller og MFA</li><li>FCM/APNs + SMS/opkald</li><li>På vej / ETA</li><li>Minimum sikkert crew</li></ul></article>
+          <article class="phase"><span class="phase-no">02</span><small>3–6 MÅNEDER</small><h3>Beredskabsplan</h3><p>Forudse om station og fartøj kan rykke sikkert ud nu og senere.</p><ul><li>Vagt, ferie og kalender</li><li>Kompetencer og udløb</li><li>Fartøjs- og materielstatus</li><li>Stationsdisplay</li></ul></article>
+          <article class="phase"><span class="phase-no">03</span><small>6–9 MÅNEDER</small><h3>Maritim mission</h3><p>Understøt position, fartøj og operation fra alarm til hjemkomst.</p><ul><li>Nautisk kort og launch point</li><li>Vejr, strøm og tidevand</li><li>Live position og tidslinje</li><li>Genmelding og debrief</li></ul></article>
+          <article class="phase"><span class="phase-no">04</span><small>9–15 MÅNEDER</small><h3>DSRS-platform</h3><p>Skalér til flere stationer med fælles regler og lokal fleksibilitet.</p><ul><li>Multi-station og hierarki</li><li>Integrationer og API</li><li>Træning og materiel</li><li>Rapporter og BI</li></ul></article>
+          <article class="phase"><span class="phase-no">05</span><small>6–18 MÅNEDER · TVÆRGÅENDE</small><h3>Robust drift</h3><p>Sikkerhed og redundans udvikles parallelt med de operative faser.</p><ul><li>EU-redundans og restore-test</li><li>SLO, overvågning og vagt</li><li>Pen-test og secure SDLC</li><li>ISMS / ISO-forberedelse</li></ul></article>
         </div>
+
+        <section class="panel benchmark-panel">
+          <div class="panel-heading"><div><span class="eyebrow">MARKEDSLÆRING</span><h2>Hvad vi tager med — og hvordan det bliver maritimt</h2></div><span class="research-badge">9 PRODUKTER · OFFICIELLE KILDER</span></div>
+          <div class="benchmark-grid">
+            <article><b>FireServiceRota</b><span>Forudsigelig bemanding</span><p>Vagt, kompetencer, minimumscrew, automatisk eskalation og leveringsdiagnostik.</p></article>
+            <article><b>Alarm Dispatcher</b><span>Alarmkanaler og svar</span><p>Ja / senere / nej, fallback, alarmgrupper, stationsmonitor og bygningsudstyr.</p></article>
+            <article><b>Active911 · GroupAlarm</b><span>Operationscockpit</span><p>Kort, preplans, playbooks, live ressourcer og samlet hændelseslog.</p></article>
+            <article><b>D4H · DIVERA · eDispatches</b><span>Drift og afslutning</span><p>ETA, tilgængelighed, rapporter, træning, materiel og kontrolleret positionsdeling.</p></article>
+          </div>
+          <div class="maritime-translation">
+            <span><b>Brandbil</b> → redningsfartøj / RHIB</span>
+            <span><b>Sæde</b> → skipper / VHF / medic / søredder</span>
+            <span><b>Adresse</b> → position / farvand / launch point</span>
+            <span><b>Kørevej</b> → station + søvej / vejr / tidevand</span>
+          </div>
+        </section>
 
         <div class="mapping-grid">
           <section class="panel map-panel">
             <div class="panel-heading"><div><span class="eyebrow">SYSTEMLANDSKAB</span><h2>Målarkitektur</h2></div></div>
             <div class="architecture">
-              <div class="arch-source"><b>Alarmerkilder</b><span>DSRS central</span><span>JRCC / 112</span><span>VHF / Søassistancen</span></div>
+              <div class="arch-source"><b>Alarmerkilder</b><span>DSRS operatør</span><span>JRCC / 112</span><span>VHF / telefon / API</span></div>
               <div class="arch-arrow">→</div>
-              <div class="arch-core"><b>Alarmplatform</b><span>API & regler</span><span>Alarmmotor</span><span>Auditlog</span><span>Organisationer</span></div>
+              <div class="arch-core"><b>DSRS alarmmotor</b><span>Hændelse & roller</span><span>Fartøj og minimumscrew</span><span>Levering & eskalation</span><span>Uforanderlig audit</span></div>
               <div class="arch-arrow">→</div>
-              <div class="arch-output"><b>Kanaler</b><span>Besætningsapp</span><span>Web / PWA</span><span>SMS / opkald fallback</span><span>Stationsskærm</span></div>
+              <div class="arch-output"><b>Flader & kanaler</b><span>Besætningsapp</span><span>Kontrolcentral / web</span><span>SMS / opkald fallback</span><span>Stationsskærm / lyd</span></div>
             </div>
           </section>
           <section class="panel decision-panel">
-            <div class="panel-heading"><div><span class="eyebrow">AFKLARINGER</span><h2>Beslutninger før fase 1</h2></div></div>
+            <div class="panel-heading"><div><span class="eyebrow">PILOT-GATES</span><h2>Beslutninger før fase 1</h2></div></div>
             <ol class="decision-list">
-              <li><span>01</span><div><b>Første målgruppe</b><small>Brandværn, søredning, virksomhed eller tværgående beredskab?</small></div></li>
-              <li><span>02</span><div><b>App-teknologi</b><small>Flutter/React Native eller native iOS + Android.</small></div></li>
-              <li><span>03</span><div><b>Push og fallback</b><small>FCM/APNs direkte eller leverandør; hvornår bruges SMS/telefon?</small></div></li>
-              <li><span>04</span><div><b>Driftskrav</b><small>Oppetid, redundans, dataplacering, logging og beredskabsprocedure.</small></div></li>
-              <li><span>05</span><div><b>Integrationer</b><small>Hvilket CAD/alarmmodtagersystem skal være første kilde?</small></div></li>
+              <li><span>01</span><div><b>Autoritet</b><small>Hvem må oprette, ændre, annullere og afslutte?</small></div></li>
+              <li><span>02</span><div><b>Sikkert crew</b><small>Hvilke roller kræver RS Køge og RHIB 01?</small></div></li>
+              <li><span>03</span><div><b>Eskalationspolitik</b><small>Deadlines og hvornår SMS/opkald aktiveres.</small></div></li>
+              <li><span>04</span><div><b>App-spor</b><small>PWA til prototype; native spor til kritisk pilotdrift.</small></div></li>
+              <li><span>05</span><div><b>Nødprocedure</b><small>Manuelt fallback ved nedetid eller ukendt levering.</small></div></li>
             </ol>
           </section>
         </div>
 
+        <section class="panel ux-panel">
+          <div class="panel-heading"><div><span class="eyebrow">UI / UX-UDKAST</span><h2>Tre operative flader — samme hændelse</h2></div><span class="research-badge">STATUS VISes MED ORD + IKON + FARVE</span></div>
+          <div class="ux-concepts">
+            <article class="ux-card control-concept"><header><b>Kontrolcentral</b><span>Beslutning på sekunder</span></header><div class="mini-alert"><strong>PERSON I VANDET</strong><small>55°27.90'N · 12°12.45'E · JRCC SAR</small></div><div class="crew-ready"><b>RS KØGE · CREW KLAR 4/4</b><small>✓ Bådfører &nbsp; ✓ VHF &nbsp; ✓ Medic &nbsp; ✓ Søredder</small></div><div class="mini-stats"><span><b>8</b> sendt</span><span><b>7</b> vist</span><span><b>4</b> accepteret</span></div></article>
+            <article class="ux-card crew-concept"><header><b>Besætningsapp</b><span>Én hånd · under pres</span></header><div class="mini-alarm"><small>KRITISK SAR · 14:49</small><strong>PERSON I VANDET</strong><span>Køge Bugt · RS Køge</span></div><div class="mini-actions"><button>✓ ACCEPTERET</button><button>PÅ STATION OM 8 MIN</button><button>× KAN IKKE</button></div></article>
+            <article class="ux-card station-concept"><header><b>Stationsskærm</b><span>Læsbar på afstand</span></header><div class="station-main"><strong>RS KØGE</strong><b>KLAR 4 / 4</b><span>Forventet afgang 14:57</span></div><div class="station-channels"><span>✓ Lyd</span><span>✓ Skærm</span><span>✓ Lys</span><span>— Port</span></div></article>
+          </div>
+          <div class="ux-rules"><span>48 px handlinger</span><span>Natvenlig kontrast</span><span>Safe-area og alle skærmstørrelser</span><span>Offline/fallback synligt</span><span>Position stopper automatisk</span></div>
+        </section>
+
         <section class="panel domain-panel">
-          <div class="panel-heading"><div><span class="eyebrow">DOMÆNEMODEL</span><h2>Kerneobjekter og ansvar</h2></div></div>
+          <div class="panel-heading"><div><span class="eyebrow">OPERATIV DATAKÆDE</span><h2>Fra tilgængelighed til læring</h2></div></div>
           <div class="domain-grid">
-            <div><b>Organisation</b><small>Tenant, stationer, politikker</small></div><span>→</span>
-            <div><b>Bruger</b><small>Identitet, roller, kompetencer</small></div><span>→</span>
-            <div><b>Vagt / status</b><small>Tilgængelighed, enhed, position</small></div><span>→</span>
-            <div><b>Alarm</b><small>Type, prioritet, lokation, payload</small></div><span>→</span>
-            <div><b>Levering</b><small>Push, retry, fallback, kvittering</small></div><span>→</span>
-            <div><b>Hændelseslog</b><small>Uforanderlig audit og rapportering</small></div>
+            <div><b>Station & fartøj</b><small>Operationsområde, status, regler</small></div><span>→</span>
+            <div><b>Person & rolle</b><small>Vagt, kompetencer, ETA</small></div><span>→</span>
+            <div><b>Maritim hændelse</b><small>Position, vejr, ombordværende</small></div><span>→</span>
+            <div><b>Mobilisering</b><small>Levering, svar, crew-gate</small></div><span>→</span>
+            <div><b>Mission</b><small>Tasking, fartøj, tidslinje</small></div><span>→</span>
+            <div><b>Afslutning</b><small>Genmelding, rapport, debrief</small></div>
           </div>
         </section>
       </section>
@@ -302,6 +337,6 @@
       <button class="primary-button" type="submit">Registrer og aktivér push</button>
     </form>
   </dialog>
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>

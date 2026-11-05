@@ -13,7 +13,7 @@ Fjern-push, enhedsregistrering og kvitteringer kører via pilotbackenden på Sim
 
 Pilotdomæne: `https://alarm.hansenlabs.dk`.
 
-Se [mobil-, web- og pushkompatibilitet](docs/MOBILE-AND-PUSH-COMPATIBILITY.md).
+Se [mobil-, web- og pushkompatibilitet](docs/MOBILE-AND-PUSH-COMPATIBILITY.md) og den samlede [produktbenchmark, maritime funktionskortlægning og roadmap](docs/PRODUCT-BENCHMARK-AND-ROADMAP.md).
 
 ## Ejerskab og versionering
 
