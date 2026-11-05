@@ -1,6 +1,6 @@
 # Fase 1A — multi-station- og fartøjsfundament
 
-**Version:** 0.8.3
+**Version:** 0.8.4
 **Dato:** 5. november 2026
 
 ## Leveret i denne del
@@ -49,6 +49,10 @@ Den installerede app viser nu enhedens parringsstatus og handlingen **Par denne 
 ## Adaptiv mobilvisning 0.8.3
 
 Installerede Android-visninger, der rapporterer en usædvanligt bred CSS-viewport, normaliseres til en læsbar 390-pixel appflade. Typografi, statuskort og trykflader har samtidig fået større minimumsstørrelser på almindelige mobilskærme.
+
+## Systemstatuslinje 0.8.4
+
+Den kunstige klokke- og signalrække er fjernet fra appens UI. Den installerede app bruger kun telefonens egen systemstatuslinje og starter DSRS-headeren direkte under det sikre skærmområde.
 
 ## Næste del
 

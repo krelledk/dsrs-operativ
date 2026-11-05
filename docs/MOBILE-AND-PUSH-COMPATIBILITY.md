@@ -30,6 +30,12 @@ En PWA kan ikke tilsidesætte telefonens lydløs-, Fokus- eller Forstyr ikke-ind
 
 iPhone/iPad kræver iOS/iPadOS 16.4 eller nyere og en installeret hjemmeskærmsapp for Web Push. Brugeren skal selv give notifikationstilladelse fra en direkte handling i appen.
 
+## Krav til kritiske alarmer i den native app
+
+- **Android:** En native app skal oprette en alarmkanal med høj vigtighed, vibration og lyd. Omgåelse af Forstyr ikke kræver Androids særlige notification-policy-adgang og brugerens/systemets tilladelse; det kan ikke gennemtvinges af PWA'en.
+- **iPhone/iPad:** Omgåelse af lydløs og Fokus kræver en native app, brugerens Critical Alerts-tilladelse og et særligt entitlement, som Apple skal godkende.
+- **Operativ fallback:** Indtil disse native tilladelser er etableret og godkendt, skal SMS/telefon/radio fortsat være dokumenteret fallback for kritiske SAR-alarmer.
+
 ## Minimumstest før pilotdrift
 
 1. Android Chrome med appen lukket, i baggrunden og åben.
@@ -43,3 +49,5 @@ iPhone/iPad kræver iOS/iPadOS 16.4 eller nyere og en installeret hjemmeskærmsa
 
 - WebKit: https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/
 - MDN `showNotification`: https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerRegistration/showNotification
+- Android `NotificationChannel.setBypassDnd`: https://developer.android.com/reference/android/app/NotificationChannel#setBypassDnd(boolean)
+- Apple Critical Alerts entitlement: https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.usernotifications.critical-alerts

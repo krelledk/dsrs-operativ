@@ -275,7 +275,7 @@ document.querySelector('#device-form').addEventListener('submit',async event=>{e
 document.querySelector('#device-dialog-close').addEventListener('click',()=>document.querySelector('#device-dialog').close());
 document.addEventListener('pointerdown',event=>{if(!event.target.closest('#sound-test-button'))primeAlarmSound()},{once:true,capture:true});
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'&&location.hash!=='#responder')document.querySelector('#alarm-form').requestSubmit()});
-function updateClocks(){const now=new Date();document.querySelector('#clock').textContent=new Intl.DateTimeFormat('da-DK',{hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(now);document.querySelector('#mobile-clock').textContent=new Intl.DateTimeFormat('da-DK',{hour:'2-digit',minute:'2-digit'}).format(now)}
+function updateClocks(){const now=new Date();document.querySelector('#clock').textContent=new Intl.DateTimeFormat('da-DK',{hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(now)}
 updateClocks();setInterval(updateClocks,1000);
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;updateInstallUI()});
 window.addEventListener('appinstalled',()=>{deferredPrompt=null;updateInstallUI();showToast('DSRS SAR er installeret.')});

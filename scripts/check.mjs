@@ -28,6 +28,8 @@ const html = await readFile('dist/index.html', 'utf8');
 const app = await readFile('dist/app.js', 'utf8');
 const serviceWorker = await readFile('dist/service-worker.js', 'utf8');
 
+if (html.includes('id="mobile-clock"') || html.includes('class="phone-status"')) throw new Error('Den kunstige mobilstatuslinje må ikke vises.');
+
 if (hosting.static?.directory !== 'dist') throw new Error('Hosting skal pege på dist/.');
 if (!manifest.name?.includes('DSRS')) throw new Error('PWA-navnet mangler DSRS.');
 if (manifest.display !== 'standalone') throw new Error('PWA skal åbne i standalone-tilstand.');
