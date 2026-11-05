@@ -40,11 +40,11 @@ $method = (string) $_SERVER['REQUEST_METHOD'];
 
 try {
     if ($action === 'health' && $method === 'GET') {
-        respond(['ok' => true, 'service' => 'DSRS SAR pilotbackend', 'version' => '0.2.0', 'time' => now()]);
+        respond(['ok' => true, 'service' => 'DSRS SAR pilotbackend', 'version' => '0.2.1', 'time' => now()]);
     }
 
     if ($action === 'config' && $method === 'GET') {
-        respond(['ok' => true, 'vapidPublicKey' => $config['vapid_public'], 'backendVersion' => '0.2.0', 'stations' => publicStations($db)]);
+        respond(['ok' => true, 'vapidPublicKey' => $config['vapid_public'], 'backendVersion' => '0.2.1', 'stations' => publicStations($db)]);
     }
 
     if ($action === 'session' && $method === 'GET') {
@@ -78,7 +78,19 @@ try {
         $body = body();
         $stationCode = strtolower(trim((string) ($body['stationCode'] ?? '')));
         $stationId = clean((string) ($body['stationId'] ?? 'station-koege'), 80);
-        if (!password_verify($stationCode, $config['station_code_hash'])) {
+        $crewName = clean((string) ($body['crewName'] ?? ''), 80);
+        $deviceId = clean((string) ($body['deviceId'] ?? ''), 100);
+        $previousDeviceToken = trim((string) ($body['deviceToken'] ?? ''));
+        $renewedSubscription = null;
+        if ($previousDeviceToken !== '') {
+            $renewalStatement = $db->prepare('SELECT * FROM subscriptions WHERE device_token_hash=:token_hash ORDER BY id DESC LIMIT 1');
+            $renewalStatement->execute([':token_hash' => hash('sha256', $previousDeviceToken)]);
+            $renewedSubscription = $renewalStatement->fetch() ?: null;
+            if ($renewedSubscription && ($renewedSubscription['device_id'] !== $deviceId || $renewedSubscription['station_id'] !== $stationId)) {
+                $renewedSubscription = null;
+            }
+        }
+        if (!$renewedSubscription && !password_verify($stationCode, $config['station_code_hash'])) {
             usleep(350000);
             respond(['ok' => false, 'error' => 'Forkert stationskode.'], 401);
         }
@@ -86,8 +98,6 @@ try {
         $stationStatement->execute([':id' => $stationId]);
         $station = $stationStatement->fetch();
         if (!$station) respond(['ok' => false, 'error' => 'Den valgte station findes ikke eller er ikke aktiv.'], 422);
-        $crewName = clean((string) ($body['crewName'] ?? ''), 80);
-        $deviceId = clean((string) ($body['deviceId'] ?? ''), 100);
         $subscription = $body['subscription'] ?? null;
         $endpoint = is_array($subscription) ? (string) ($subscription['endpoint'] ?? '') : '';
         if ($crewName === '' || $deviceId === '' || !is_array($subscription) || !filter_var($endpoint, FILTER_VALIDATE_URL)) {
@@ -105,15 +115,28 @@ try {
             ':station_id' => $station['id'],
             ':now' => now(),
         ]);
-        audit($db, 'device_subscribed', null, ['crewName' => $crewName, 'deviceId' => $deviceId, 'stationId' => $station['id']]);
-        respond(['ok' => true, 'deviceToken' => $deviceToken, 'crewName' => $crewName, 'station' => ['id' => $station['id'], 'name' => $station['name']]]);
+        audit($db, $renewedSubscription ? 'device_subscription_renewed' : 'device_subscribed', null, ['crewName' => $crewName, 'deviceId' => $deviceId, 'stationId' => $station['id']]);
+        respond(['ok' => true, 'deviceToken' => $deviceToken, 'crewName' => $crewName, 'renewed' => (bool) $renewedSubscription, 'station' => ['id' => $station['id'], 'name' => $station['name']]]);
     }
 
     if ($action === 'current' && $method === 'GET') {
         $subscription = requireDevice($db);
-        $statement = $db->prepare('SELECT a.*, s.name AS station_name, d.delivery_token, d.push_sent_at, d.app_received_at, d.notification_shown_at, d.response, d.response_at FROM alarms a JOIN deliveries d ON d.alarm_id=a.id LEFT JOIN stations s ON s.id=a.station_id WHERE d.subscription_id=:subscription_id AND a.completed_at IS NULL ORDER BY a.created_at DESC LIMIT 1');
-        $statement->execute([':subscription_id' => $subscription['id']]);
+        $statement = $db->prepare('SELECT a.*, s.name AS station_name, d.delivery_token, d.push_sent_at, d.app_received_at, d.notification_shown_at, d.response, d.response_at FROM alarms a LEFT JOIN deliveries d ON d.alarm_id=a.id AND d.subscription_id=:subscription_id LEFT JOIN stations s ON s.id=a.station_id WHERE a.station_id=:station_id AND a.completed_at IS NULL ORDER BY a.created_at DESC LIMIT 1');
+        $statement->execute([':subscription_id' => $subscription['id'], ':station_id' => $subscription['station_id']]);
         $row = $statement->fetch();
+        if ($row && empty($row['delivery_token'])) {
+            $deliveryToken = token(32);
+            $db->prepare('INSERT INTO deliveries(alarm_id,subscription_id,delivery_token,token_hash,created_at) VALUES(:alarm_id,:subscription_id,:delivery_token,:token_hash,:created_at)')->execute([
+                ':alarm_id' => $row['id'], ':subscription_id' => $subscription['id'], ':delivery_token' => $deliveryToken, ':token_hash' => hash('sha256', $deliveryToken), ':created_at' => now(),
+            ]);
+            $row['delivery_token'] = $deliveryToken;
+            $row['push_sent_at'] = null;
+            $row['app_received_at'] = null;
+            $row['notification_shown_at'] = null;
+            $row['response'] = null;
+            $row['response_at'] = null;
+            audit($db, 'active_alarm_recovered_by_app', (string) $row['id'], ['subscriptionId' => (int) $subscription['id']]);
+        }
         respond(['ok' => true, 'alarm' => $row ? alarmPayload($row, $row['delivery_token']) : null, 'delivery' => $row ? deliveryPayload($row) : null]);
     }
 

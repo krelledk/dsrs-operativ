@@ -1,6 +1,6 @@
 const STORAGE = { alarms: 'dsrs.alarms.v2', current: 'dsrs.current.v2', responses: 'dsrs.responses.v2', delivery: 'dsrs.delivery.v2', logs: 'dsrs.logs.v2' };
 const API = 'api/index.php';
-const DEVICE = { token: 'dsrs.deviceToken.v1', id: 'dsrs.deviceId.v1', name: 'dsrs.crewName.v1', station: 'dsrs.stationId.v1', stationName: 'dsrs.stationName.v1' };
+const DEVICE = { token: 'dsrs.deviceToken.v1', id: 'dsrs.deviceId.v1', name: 'dsrs.crewName.v1', station: 'dsrs.stationId.v1', stationName: 'dsrs.stationName.v1', repair: 'dsrs.deviceRepair.v1' };
 const channel = 'BroadcastChannel' in window ? new BroadcastChannel('alarmberedskab') : null;
 const crew = [
   ['MA','Maja Andersen','Skipper','accepted'],['JL','Jonas Lund','Navigatør','wait'],['SK','Sara Kjær','Bådfører','accepted'],['MN','Mikkel Nielsen','Søredder','accepted'],
@@ -20,6 +20,7 @@ let remoteActiveCount=null;
 let pendingDispatch=null;
 let pendingCompletion=false;
 let serviceWorkerRegistrationPromise=null;
+let deviceRenewalPromise=null;
 let alarmAudioContext=null;
 let alarmOscillator=null;
 let alarmGain=null;
@@ -153,11 +154,41 @@ async function enableNotifications(){
   if(!('Notification'in window)||!('serviceWorker'in navigator)||!('PushManager'in window)){showToast('Denne browser understøtter ikke Web Push.',true);return}
   if(!backendOnline||!backendConfig){showToast('Pilotbackenden er ikke tilgængelig endnu.',true);return}
   if(!localStorage.getItem(DEVICE.token)){document.querySelector('#device-dialog').showModal();return}
+  if(localStorage.getItem(DEVICE.repair)==='1'){
+    try{await renewDeviceRegistration();write(STORAGE.current,null);await loadCurrentAlarm(true,false);showToast('Telefonens pushforbindelse er genoprettet.');return}catch(error){showToast(error.message||'Pushforbindelsen kunne ikke genoprettes. Registrér telefonen igen.',true);document.querySelector('#device-dialog').showModal();return}
+  }
   const permission=await Notification.requestPermission();
-  if(permission==='granted'){showToast('Pushnotifikationer er aktiveret.');document.querySelector('#notification-button').textContent='Pushnotifikationer aktiveret'}else showToast('Notifikationer blev ikke tilladt.',true)
+  if(permission==='granted'){await loadCurrentAlarm(true);showToast('Pushnotifikationer er aktiveret.');document.querySelector('#notification-button').textContent='Pushnotifikationer aktiveret'}else showToast('Notifikationer blev ikke tilladt.',true)
 }
 
 function base64Key(value){const padding='='.repeat((4-value.length%4)%4);const raw=atob((value+padding).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from([...raw].map(char=>char.charCodeAt(0)))}
+async function freshPushSubscription(forceRefresh=false){
+  const registration=await ensureServiceWorker();
+  let subscription=await withTimeout(registration.pushManager.getSubscription(),10000,'Telefonens push-service svarede ikke. Luk appen helt, og prøv igen.');
+  if(forceRefresh&&subscription){
+    const removed=await withTimeout(subscription.unsubscribe(),10000,'Den udløbne pushforbindelse kunne ikke fjernes. Luk appen helt, og prøv igen.');
+    if(!removed)throw new Error('Den udløbne pushforbindelse kunne ikke nulstilles. Luk appen helt, åbn den igen, og tryk Aktivér pushnotifikationer.');
+    subscription=null;
+  }
+  if(!subscription){
+    setDeviceStatus('Opretter den krypterede pushforbindelse …','working');
+    try{subscription=await withTimeout(registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:base64Key(backendConfig.vapidPublicKey)}),20000,'Telefonens push-tjeneste brugte for lang tid. Kontrollér internetforbindelsen, og prøv igen.')}catch(error){if(error?.name==='NotAllowedError')throw new Error('Telefonen afviste pushnotifikationer. Tillad notifikationer i telefonens indstillinger.');throw error}
+  }
+  return subscription;
+}
+async function renewDeviceRegistration(){
+  if(deviceRenewalPromise)return deviceRenewalPromise;
+  deviceRenewalPromise=(async()=>{
+    const previousToken=localStorage.getItem(DEVICE.token);const deviceId=localStorage.getItem(DEVICE.id);const crewName=localStorage.getItem(DEVICE.name);const stationId=localStorage.getItem(DEVICE.station);
+    if(!previousToken||!deviceId||!crewName||!stationId)throw new Error('Telefonen mangler registreringsoplysninger og skal registreres igen.');
+    if(Notification.permission!=='granted')throw new Error('Tillad notifikationer for DSRS SAR i telefonens indstillinger.');
+    setDeviceStatus('Genopretter telefonens pushforbindelse …','working');
+    const subscription=await freshPushSubscription(true);
+    const result=await withTimeout(api('subscribe',{method:'POST',body:{stationCode:'',stationId,crewName,deviceId,deviceToken:previousToken,subscription:subscription.toJSON()}}),15000,'DSRS-serveren svarede ikke under genregistrering.');
+    localStorage.setItem(DEVICE.token,result.deviceToken);localStorage.setItem(DEVICE.name,result.crewName);localStorage.setItem(DEVICE.station,result.station.id);localStorage.setItem(DEVICE.stationName,result.station.name);localStorage.removeItem(DEVICE.repair);updateMobileIdentity();document.querySelector('#notification-button').textContent='Pushnotifikationer aktiveret';setDeviceStatus(`Pushforbindelsen til ${result.station.name} er genoprettet.`,'success');return result;
+  })().finally(()=>{deviceRenewalPromise=null});
+  return deviceRenewalPromise;
+}
 async function registerDevice(crewName,stationCode,stationId){
   if(!window.isSecureContext)throw new Error('Web Push kræver en sikker HTTPS-forbindelse.');
   if(isIOS()&&!isStandalone())throw new Error('På iPhone skal DSRS SAR først føjes til hjemmeskærmen og åbnes derfra.');
@@ -167,20 +198,15 @@ async function registerDevice(crewName,stationCode,stationId){
   if(permission==='denied')throw new Error('Notifikationer er blokeret. Tillad dem for DSRS SAR i telefonens indstillinger, og prøv igen.');
   if(permission!=='granted')throw new Error('Notifikationer blev ikke tilladt. Tryk igen, og vælg Tillad.');
   setDeviceStatus('Starter telefonens sikre push-service …','working');
-  const registration=await ensureServiceWorker();
-  let subscription=await withTimeout(registration.pushManager.getSubscription(),10000,'Telefonens push-service svarede ikke. Luk appen helt, og prøv igen.');
-  if(!subscription){
-    setDeviceStatus('Opretter den krypterede pushforbindelse …','working');
-    try{subscription=await withTimeout(registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:base64Key(backendConfig.vapidPublicKey)}),20000,'Telefonens push-tjeneste brugte for lang tid. Kontrollér internetforbindelsen, og prøv igen.')}catch(error){if(error?.name==='NotAllowedError')throw new Error('Telefonen afviste pushnotifikationer. Tillad notifikationer i telefonens indstillinger.');throw error}
-  }
+  const previousToken=localStorage.getItem(DEVICE.token);const subscription=await freshPushSubscription(localStorage.getItem(DEVICE.repair)==='1');
   setDeviceStatus('Registrerer telefonen hos DSRS SAR …','working');
   let deviceId=localStorage.getItem(DEVICE.id);if(!deviceId){deviceId=crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`;localStorage.setItem(DEVICE.id,deviceId)}
-  const result=await withTimeout(api('subscribe',{method:'POST',body:{stationCode,stationId,crewName,deviceId,subscription:subscription.toJSON()}}),15000,'DSRS-serveren svarede ikke. Kontrollér internetforbindelsen, og prøv igen.');
-  localStorage.setItem(DEVICE.token,result.deviceToken);localStorage.setItem(DEVICE.name,result.crewName);localStorage.setItem(DEVICE.station,result.station.id);localStorage.setItem(DEVICE.stationName,result.station.name);updateMobileIdentity();document.querySelector('#notification-button').textContent='Pushnotifikationer aktiveret';setDeviceStatus(`Telefonen er registreret til ${result.station.name}, og pushnotifikationer er aktiveret.`,'success');showToast(`Denne telefon er registreret til ${result.station.name}.`);await loadCurrentAlarm()
+  const result=await withTimeout(api('subscribe',{method:'POST',body:{stationCode,stationId,crewName,deviceId,deviceToken:previousToken||undefined,subscription:subscription.toJSON()}}),15000,'DSRS-serveren svarede ikke. Kontrollér internetforbindelsen, og prøv igen.');
+  localStorage.setItem(DEVICE.token,result.deviceToken);localStorage.setItem(DEVICE.name,result.crewName);localStorage.setItem(DEVICE.station,result.station.id);localStorage.setItem(DEVICE.stationName,result.station.name);localStorage.removeItem(DEVICE.repair);updateMobileIdentity();document.querySelector('#notification-button').textContent='Pushnotifikationer aktiveret';setDeviceStatus(`Telefonen er registreret til ${result.station.name}, og pushnotifikationer er aktiveret.`,'success');showToast(`Denne telefon er registreret til ${result.station.name}.`);write(STORAGE.current,null);await loadCurrentAlarm(true,false)
 }
-async function loadCurrentAlarm(soundOnNew=false){const token=localStorage.getItem(DEVICE.token);if(!token||!backendOnline)return;const previousId=currentAlarm()?.id;try{const result=await api('current',{token});if(result.alarm){const isNew=previousId!==result.alarm.id;write(STORAGE.current,result.alarm);write(STORAGE.delivery,{alarmId:result.alarm.id,createdAt:result.alarm.createdAt,pushSentAt:result.delivery?.pushSentAt,appReceivedAt:result.delivery?.appReceivedAt,notificationShownAt:result.delivery?.notificationShownAt});renderAlarm();if(isNew&&soundOnNew){api('receipt',{method:'POST',body:{deliveryToken:result.alarm.deliveryToken,stage:'received'}}).catch(()=>null);if(notify(result.alarm))api('receipt',{method:'POST',body:{deliveryToken:result.alarm.deliveryToken,stage:'shown'}}).catch(()=>null)}if((isNew&&soundOnNew)||/(?:\?|&)alert=1(?:&|$)/.test(location.hash))startAlarmSoundOnce(result.alarm)}else if(previousId){clearActiveAlarm('Alarmen er afsluttet af kontrolcentralen.')}}catch(error){if(/token/i.test(error.message)){localStorage.removeItem(DEVICE.token);document.querySelector('#notification-button').textContent='Aktivér pushnotifikationer'}}}
+async function loadCurrentAlarm(soundOnNew=false,allowRenew=true){const token=localStorage.getItem(DEVICE.token);if(!token||!backendOnline)return;const previousId=currentAlarm()?.id;try{const result=await api('current',{token});if(result.alarm){const isNew=previousId!==result.alarm.id;write(STORAGE.current,result.alarm);write(STORAGE.delivery,{alarmId:result.alarm.id,createdAt:result.alarm.createdAt,pushSentAt:result.delivery?.pushSentAt,appReceivedAt:result.delivery?.appReceivedAt,notificationShownAt:result.delivery?.notificationShownAt});renderAlarm();if(isNew&&soundOnNew){api('receipt',{method:'POST',body:{deliveryToken:result.alarm.deliveryToken,stage:'received'}}).catch(()=>null);if(notify(result.alarm))api('receipt',{method:'POST',body:{deliveryToken:result.alarm.deliveryToken,stage:'shown'}}).catch(()=>null)}if((isNew&&soundOnNew)||/(?:\?|&)alert=1(?:&|$)/.test(location.hash))startAlarmSoundOnce(result.alarm)}else if(previousId){clearActiveAlarm('Alarmen er afsluttet af kontrolcentralen.')}}catch(error){if(/token/i.test(error.message)){localStorage.setItem(DEVICE.repair,'1');document.querySelector('#notification-button').textContent='Genaktivér pushnotifikationer';if(allowRenew){try{await renewDeviceRegistration();write(STORAGE.current,null);return loadCurrentAlarm(true,false)}catch(renewalError){setDeviceStatus(renewalError.message||'Pushforbindelsen skal genaktiveres.','error');showToast('Mobilens pushforbindelse skal genaktiveres.',true)}}}}}
 async function pollRemoteStatus(){if(!backendOnline||!csrfToken)return;const station=selectedControlStation();try{const result=await api('status',{query:{stationId:station.id}});remoteActiveCount=result.activeCount??(result.alarm?1:0);if(result.alarm){write(STORAGE.current,result.alarm);remoteDeliveries=result.deliveries;const first=key=>result.deliveries.map(item=>item[key]).filter(Boolean).sort()[0]||null;write(STORAGE.delivery,{alarmId:result.alarm.id,createdAt:result.alarm.createdAt,pushSentAt:first('push_sent_at'),appReceivedAt:first('app_received_at'),notificationShownAt:first('notification_shown_at')});renderAlarm()}else if(currentAlarm()){clearActiveAlarm(`Der er ingen aktiv SAR-alarm på ${station.name}.`,false)}else renderAlarm()}catch(error){if(/login/i.test(error.message))csrfToken=null}}
-async function initialiseBackend(){try{backendConfig=await api('config');backendOnline=true;populateStations();const session=await api('session');csrfToken=session.authenticated?session.csrfToken:null;if(localStorage.getItem(DEVICE.token)){document.querySelector('#notification-button').textContent='Pushnotifikationer aktiveret';loadCurrentAlarm()}if(csrfToken)pollRemoteStatus()}catch{backendOnline=false;populateStations()}}
+async function initialiseBackend(){try{backendConfig=await api('config');backendOnline=true;populateStations();const session=await api('session');csrfToken=session.authenticated?session.csrfToken:null;if(localStorage.getItem(DEVICE.token)){document.querySelector('#notification-button').textContent=localStorage.getItem(DEVICE.repair)==='1'?'Genaktivér pushnotifikationer':'Pushnotifikationer aktiveret';loadCurrentAlarm()}if(csrfToken)pollRemoteStatus()}catch{backendOnline=false;populateStations()}}
 
 function isStandalone(){return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true}
 function isIOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent)}

@@ -1,6 +1,6 @@
 # Fase 1A — multi-station- og fartøjsfundament
 
-**Version:** 0.8.0  
+**Version:** 0.8.1
 **Dato:** 5. november 2026
 
 ## Leveret i denne del
@@ -37,6 +37,10 @@ ID'er er stabile og adskilt fra navne. Et stations- eller fartøjsnavn kan derfo
 Stationskoden er fortsat en fælles pilotkode. Den er ikke den fremtidige identitets- eller rettighedsmodel. Før drift på flere stationer skal den erstattes af personligt login, medlemskaber, roller, MFA for operatører og stationsspecifik adgangskontrol.
 
 Fartøjsvalget er i denne første del metadata for hændelsen. Push målrettes stationen, indtil personer også har eksplicitte fartøjs-, rolle- og kompetencetilknytninger.
+
+## Driftshærdning 0.8.1
+
+Hvis Android/iOS-pushtjenesten erklærer et abonnement udløbet, markerer serveren det fortsat inaktivt. Appen kan nu genkende den ugyldige enhedstoken, fjerne den udløbne browserforbindelse og oprette en ny med den eksisterende, stationsbundne enhedsidentitet. En genregistreret app henter desuden straks stationens aktive alarm, også når alarmen blev oprettet, mens telefonen var afkoblet.
 
 ## Næste del
 

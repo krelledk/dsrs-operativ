@@ -39,11 +39,11 @@ if (!manifest.icons?.some((icon) => icon.purpose === 'maskable')) throw new Erro
 for (const marker of ['DSRS', 'SAR kontrolcentral', 'Accepteret', 'Ej accepteret', 'Test lyd', 'Afslut alarm', 'FireServiceRota', 'Maritim mission', 'Minimum sikkert crew', '14+ stationer', 'Samtidige hændelser']) {
   if (!html.includes(marker)) throw new Error(`Påkrævet UI-markør mangler: ${marker}`);
 }
-for (const marker of ['startAlarmSound', 'primeAlarmSound', 'createAlarmWav', 'completeRemoteAlarm', 'loadCurrentAlarm(true)']) {
+for (const marker of ['startAlarmSound', 'primeAlarmSound', 'createAlarmWav', 'completeRemoteAlarm', 'loadCurrentAlarm(true)', 'renewDeviceRegistration', 'freshPushSubscription(true)']) {
   if (!app.includes(marker)) throw new Error(`Alarmlyd/fallback mangler: ${marker}`);
 }
 const api = await readFile('dist/api/index.php', 'utf8');
-for (const marker of ["$action === 'complete'", 'completed_at IS NULL', 'alarm_completed', "completed_by='superseded'", 'station_id', 'publicStations', 'vessel_ids_json', 'station-faxe-ladeplads']) {
+for (const marker of ["$action === 'complete'", 'completed_at IS NULL', 'alarm_completed', "completed_by='superseded'", 'station_id', 'publicStations', 'vessel_ids_json', 'station-faxe-ladeplads', 'device_subscription_renewed', 'active_alarm_recovered_by_app']) {
   if (!api.includes(marker)) throw new Error(`Alarm-afslutning mangler: ${marker}`);
 }
 for (const marker of ['silent:false', 'vibrate:', 'setAppBadge']) {
