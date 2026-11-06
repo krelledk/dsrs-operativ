@@ -7,6 +7,7 @@ En buildless pilot til Dansk Søredningsselskab med kontrolcentral, installerbar
 - Installerbar besætnings-PWA med Web Push, systemlyd/vibration, SAR-tone, position, situationsmelding og valget Accepteret / Ej accepteret.
 - Aktiv alarm kan afsluttes fra kontrolcentralen; den fjernes derefter automatisk i registrerede apps.
 - Fartøjsspecifik minimums- og maksimumsbemanding med hierarkiske pladser, manuel besætningsgodkendelse og valgfri automatisk start ved sikker minimumsbesætning.
+- Valgfrit AI-testhold med tydeligt mærkede fiktive roller, kompetencer, svartider og både accepterede og afviste testsvar.
 - Besætningsappen viser installeret version/build, kontrollerer serverens seneste version og kan hente en opdatering uden at slette parring eller push-token.
 - Projektmapping fra prototype til robust, integreret alarmplatform.
 
@@ -20,7 +21,7 @@ Pilotdomæne: `https://alarm.hansenlabs.dk`.
 
 Se [mobil-, web- og pushkompatibilitet](docs/MOBILE-AND-PUSH-COMPATIBILITY.md) og den samlede [produktbenchmark, maritime funktionskortlægning og roadmap](docs/PRODUCT-BENCHMARK-AND-ROADMAP.md).
 
-Fase 1 er påbegyndt med det [bagudkompatible multi-station- og fartøjsfundament](docs/PHASE-1-MULTI-STATION-FOUNDATION.md), [person-, medlemskabs- og kompetencegrundlaget](docs/PHASE-1B-CREW-IDENTITY.md), [stationskoordinatorer og alarmsikkerhed](docs/PHASE-1C-COORDINATORS-AND-ALARM-SAFETY.md) samt [fartøjsspecifik besætningsudvælgelse](docs/PHASE-1D-VESSEL-CREW-ASSIGNMENT.md).
+Fase 1 er påbegyndt med det [bagudkompatible multi-station- og fartøjsfundament](docs/PHASE-1-MULTI-STATION-FOUNDATION.md), [person-, medlemskabs- og kompetencegrundlaget](docs/PHASE-1B-CREW-IDENTITY.md), [stationskoordinatorer og alarmsikkerhed](docs/PHASE-1C-COORDINATORS-AND-ALARM-SAFETY.md), [fartøjsspecifik besætningsudvælgelse](docs/PHASE-1D-VESSEL-CREW-ASSIGNMENT.md) og [simuleret AI-testbesætning](docs/PHASE-1E-AI-TEST-CREW.md).
 
 ## Ejerskab og versionering
 

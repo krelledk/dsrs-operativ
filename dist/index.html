@@ -15,8 +15,8 @@
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=27">
-  <link rel="stylesheet" href="crew.css?v=27">
+  <link rel="stylesheet" href="styles.css?v=28">
+  <link rel="stylesheet" href="crew.css?v=28">
 </head>
 <body>
   <div class="shell">
@@ -150,6 +150,11 @@
                 <label class="switch" for="auto-start-assistance"><input id="auto-start-assistance" type="checkbox" checked><span aria-hidden="true"></span></label>
                 <div><b>Start assistance ved sikker minimumsbesætning</b><small id="auto-start-help">Aktiveret som standard ved MAYDAY. Systemet starter først, når minimum og alle krævede pladser er dækket.</small></div>
                 <strong id="auto-start-state">AUTO TIL</strong>
+              </div>
+              <div class="test-responder-control">
+                <label class="switch test-switch" for="include-test-responders"><input id="include-test-responders" type="checkbox"><span aria-hidden="true"></span></label>
+                <div><b><mark>TESTDATA</mark> AI-testpersoner</b><small id="test-responder-help">Tilføjer simulerede personer med forskellige roller og kompetencer. De svarer automatisk med korte forsinkelser.</small></div>
+                <strong id="test-responder-state">TEST FRA</strong>
               </div>
               <div class="dispatch-footer">
                 <div class="recipient-summary"><span id="recipient-count">6</span> søreddere · Push + kritisk lyd</div>
@@ -416,6 +421,6 @@
     </form>
   </dialog>
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="app.js?v=27"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>
