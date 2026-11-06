@@ -15,7 +15,8 @@
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=26">
+  <link rel="stylesheet" href="styles.css?v=27">
+  <link rel="stylesheet" href="crew.css?v=27">
 </head>
 <body>
   <div class="shell">
@@ -145,6 +146,11 @@
                   <label><input type="checkbox" value="Hele stationen"><span><b>∞</b><em>Hele stationen</em><small>8 personer</small></span></label>
                 </div>
               </fieldset>
+              <div class="auto-start-control">
+                <label class="switch" for="auto-start-assistance"><input id="auto-start-assistance" type="checkbox" checked><span aria-hidden="true"></span></label>
+                <div><b>Start assistance ved sikker minimumsbesætning</b><small id="auto-start-help">Aktiveret som standard ved MAYDAY. Systemet starter først, når minimum og alle krævede pladser er dækket.</small></div>
+                <strong id="auto-start-state">AUTO TIL</strong>
+              </div>
               <div class="dispatch-footer">
                 <div class="recipient-summary"><span id="recipient-count">6</span> søreddere · Push + kritisk lyd</div>
                 <button class="alarm-button" type="submit"><span>●</span> UDSEND SAR-ALARM</button>
@@ -176,6 +182,13 @@
             </div>
             <div class="progress"><span id="response-progress" style="width:100%"></span></div>
             <div class="qualification-note" id="qualification-note"><b>Kompetencegrundlag</b><span>Pilotoplysninger er ikke verificeret endnu og må ikke bruges som endelig crew-godkendelse.</span></div>
+            <section class="crew-assignment-panel" id="crew-assignment-panel" hidden>
+              <div class="crew-assignment-heading"><div><span class="eyebrow">BESÆTNINGSVALG</span><h3>Vælg sikker besætning</h3></div><span id="assistance-mode-badge">MANUEL</span></div>
+              <div class="vessel-requirements" id="vessel-requirements"></div>
+              <p class="crew-validation" id="crew-validation" role="status" aria-live="polite"></p>
+              <div class="crew-candidates" id="crew-candidates"></div>
+              <div class="crew-assignment-actions"><button id="suggest-crew-button" type="button">Foreslå minimum</button><button id="start-assistance-button" type="button">Bekræft og start assistance</button></div>
+            </section>
             <div class="crew-list" id="crew-list"></div>
           </section>
         </div>
@@ -403,6 +416,6 @@
     </form>
   </dialog>
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="app.js?v=26"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>

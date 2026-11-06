@@ -40,11 +40,11 @@ $method = (string) $_SERVER['REQUEST_METHOD'];
 
 try {
     if ($action === 'health' && $method === 'GET') {
-        respond(['ok' => true, 'service' => 'DSRS SAR pilotbackend', 'version' => '0.5.0', 'time' => now()]);
+        respond(['ok' => true, 'service' => 'DSRS SAR pilotbackend', 'version' => '0.6.0', 'time' => now()]);
     }
 
     if ($action === 'config' && $method === 'GET') {
-        respond(['ok' => true, 'vapidPublicKey' => $config['vapid_public'], 'backendVersion' => '0.5.0', 'stations' => publicStations($db), 'crewProfile' => crewProfileOptions($db)]);
+        respond(['ok' => true, 'vapidPublicKey' => $config['vapid_public'], 'backendVersion' => '0.6.0', 'stations' => publicStations($db), 'crewProfile' => crewProfileOptions($db)]);
     }
 
     if ($action === 'session' && $method === 'GET') {
@@ -194,17 +194,19 @@ try {
         $statement->execute([':token_hash' => hash('sha256', $deliveryToken)]);
         $delivery = $statement->fetch();
         if (!$delivery) respond(['ok' => false, 'error' => 'Ukendt leveringstoken.'], 404);
+        $assistanceStarted = false;
         if ($stage === 'received') {
             $db->prepare('UPDATE deliveries SET app_received_at=COALESCE(app_received_at,:now) WHERE id=:id')->execute([':now' => now(), ':id' => $delivery['id']]);
         } elseif ($stage === 'shown') {
             $db->prepare('UPDATE deliveries SET app_received_at=COALESCE(app_received_at,:now), notification_shown_at=COALESCE(notification_shown_at,:now) WHERE id=:id')->execute([':now' => now(), ':id' => $delivery['id']]);
         } elseif ($stage === 'response' && in_array($response, ['accepted', 'rejected'], true)) {
             $db->prepare('UPDATE deliveries SET response=:response, response_at=:now WHERE id=:id')->execute([':response' => $response, ':now' => now(), ':id' => $delivery['id']]);
+            if ($response === 'accepted') $assistanceStarted = tryAutoStartAssistance($db, (string) $delivery['alarm_id']);
         } else {
             respond(['ok' => false, 'error' => 'Ugyldig kvittering.'], 422);
         }
         audit($db, 'delivery_' . $stage, (string) $delivery['alarm_id'], ['response' => $response ?: null]);
-        respond(['ok' => true]);
+        respond(['ok' => true, 'assistanceStarted' => $assistanceStarted]);
     }
 
     if ($action === 'dispatch' && $method === 'POST') {
@@ -244,6 +246,9 @@ try {
             $vesselStatement->execute(array_merge([$stationId], $vesselIds));
             if (count($vesselStatement->fetchAll()) !== count($vesselIds)) respond(['ok' => false, 'error' => 'Et eller flere valgte fartøjer tilhører ikke stationen.'], 422);
         }
+        if ($vesselIds === []) respond(['ok' => false, 'error' => 'Vælg mindst ét fartøj med en bemandingsprofil.'], 422);
+        $priority = clean((string) ($body['priority'] ?? 'high'), 20);
+        $autoStartAssistance = array_key_exists('autoStartAssistance', $body) ? filter_var($body['autoStartAssistance'], FILTER_VALIDATE_BOOLEAN) : $priority === 'critical';
         $alarm = [
             'id' => bin2hex(random_bytes(12)),
             'stationId' => $station['id'],
@@ -252,10 +257,14 @@ try {
             'position' => ($latitude !== false && $longitude !== false) ? ['latitude' => (float) $latitude, 'longitude' => (float) $longitude, 'source' => $positionSource] : null,
             'vesselIds' => $vesselIds,
             'type' => clean((string) ($body['type'] ?? ''), 100),
-            'priority' => clean((string) ($body['priority'] ?? 'high'), 20),
+            'priority' => $priority,
             'location' => clean((string) ($body['location'] ?? ''), 220),
             'message' => clean((string) ($body['message'] ?? ''), 1500),
             'units' => array_values(array_slice(array_filter(array_map(fn($value) => clean((string) $value, 80), (array) ($body['units'] ?? []))), 0, 20)),
+            'autoStartAssistance' => $autoStartAssistance,
+            'assistanceStartedAt' => null,
+            'assistanceStartedBy' => null,
+            'selectedCrew' => [],
             'createdAt' => now(),
         ];
         if ($alarm['type'] === '' || $alarm['location'] === '' || $alarm['units'] === []) {
@@ -263,8 +272,8 @@ try {
         }
         $db->beginTransaction();
         $db->prepare("UPDATE alarms SET completed_at=:completed_at, completed_by='superseded' WHERE completed_at IS NULL AND station_id=:station_id")->execute([':completed_at' => now(), ':station_id' => $stationId]);
-        $db->prepare('INSERT INTO alarms(id,station_id,coordinator_id,coordinator_snapshot_json,latitude,longitude,position_source,vessel_ids_json,type,priority,location,message,units_json,created_at,created_by) VALUES(:id,:station_id,:coordinator_id,:coordinator_snapshot,:latitude,:longitude,:position_source,:vessel_ids,:type,:priority,:location,:message,:units,:created_at,:created_by)')->execute([
-            ':id' => $alarm['id'], ':station_id' => $stationId, ':coordinator_id' => $coordinatorId ?: null, ':coordinator_snapshot' => $coordinator ? json_encode($coordinator, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) : null, ':latitude' => $alarm['position']['latitude'] ?? null, ':longitude' => $alarm['position']['longitude'] ?? null, ':position_source' => $alarm['position']['source'] ?? 'manual', ':vessel_ids' => json_encode($vesselIds, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), ':type' => $alarm['type'], ':priority' => $alarm['priority'], ':location' => $alarm['location'], ':message' => $alarm['message'], ':units' => json_encode($alarm['units'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), ':created_at' => $alarm['createdAt'], ':created_by' => 'control',
+        $db->prepare('INSERT INTO alarms(id,station_id,coordinator_id,coordinator_snapshot_json,latitude,longitude,position_source,vessel_ids_json,type,priority,location,message,units_json,auto_start_assistance,selected_crew_json,created_at,created_by) VALUES(:id,:station_id,:coordinator_id,:coordinator_snapshot,:latitude,:longitude,:position_source,:vessel_ids,:type,:priority,:location,:message,:units,:auto_start_assistance,:selected_crew,:created_at,:created_by)')->execute([
+            ':id' => $alarm['id'], ':station_id' => $stationId, ':coordinator_id' => $coordinatorId ?: null, ':coordinator_snapshot' => $coordinator ? json_encode($coordinator, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) : null, ':latitude' => $alarm['position']['latitude'] ?? null, ':longitude' => $alarm['position']['longitude'] ?? null, ':position_source' => $alarm['position']['source'] ?? 'manual', ':vessel_ids' => json_encode($vesselIds, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), ':type' => $alarm['type'], ':priority' => $alarm['priority'], ':location' => $alarm['location'], ':message' => $alarm['message'], ':units' => json_encode($alarm['units'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), ':auto_start_assistance' => $autoStartAssistance ? 1 : 0, ':selected_crew' => '[]', ':created_at' => $alarm['createdAt'], ':created_by' => 'control',
         ]);
         $subscriptionStatement = $db->prepare('SELECT * FROM subscriptions WHERE active=1 AND station_id=:station_id ORDER BY id');
         $subscriptionStatement->execute([':station_id' => $stationId]);
@@ -306,8 +315,22 @@ try {
                 if ($report->isSubscriptionExpired()) $db->prepare('UPDATE subscriptions SET active=0 WHERE id=:id')->execute([':id' => $delivery['subscription']['id']]);
             }
         }
-        audit($db, 'alarm_dispatched', $alarm['id'], ['stationId' => $stationId, 'coordinatorId' => $coordinatorId ?: null, 'positionSource' => $alarm['position']['source'] ?? 'manual', 'vesselIds' => $vesselIds, 'subscriptions' => count($subscriptions), 'sent' => $sent, 'failed' => $failed]);
+        audit($db, 'alarm_dispatched', $alarm['id'], ['stationId' => $stationId, 'coordinatorId' => $coordinatorId ?: null, 'positionSource' => $alarm['position']['source'] ?? 'manual', 'vesselIds' => $vesselIds, 'autoStartAssistance' => $autoStartAssistance, 'subscriptions' => count($subscriptions), 'sent' => $sent, 'failed' => $failed]);
         respond(['ok' => true, 'alarm' => $alarm, 'delivery' => ['recipients' => count($subscriptions), 'sent' => $sent, 'failed' => $failed]]);
+    }
+
+    if ($action === 'crew-start' && $method === 'POST') {
+        requireAdmin();
+        requireCsrf();
+        $body = body();
+        $alarmId = clean((string) ($body['alarmId'] ?? ''), 100);
+        $personIds = array_values(array_unique(array_slice(array_filter(array_map(fn($value) => clean((string) $value, 100), (array) ($body['personIds'] ?? []))), 0, 30)));
+        if ($alarmId === '' || $personIds === []) respond(['ok' => false, 'error' => 'Vælg den besætning, der skal starte assistancen.'], 422);
+        $result = startAssistanceWithCrew($db, $alarmId, $personIds, 'control');
+        if (!$result['ok']) respond(['ok' => false, 'error' => $result['error']], 422);
+        $alarmStatement = $db->prepare('SELECT a.*,s.name AS station_name FROM alarms a LEFT JOIN stations s ON s.id=a.station_id WHERE a.id=:id LIMIT 1');
+        $alarmStatement->execute([':id' => $alarmId]);
+        respond(['ok' => true, 'alarm' => alarmPayload($alarmStatement->fetch())]);
     }
 
     if ($action === 'status' && $method === 'GET') {
@@ -318,7 +341,7 @@ try {
         $alarm = $alarmStatement->fetch();
         $activeCount = (int) $db->query('SELECT COUNT(*) FROM alarms WHERE completed_at IS NULL')->fetchColumn();
         if (!$alarm) respond(['ok' => true, 'alarm' => null, 'deliveries' => [], 'activeCount' => $activeCount]);
-        $statement = $db->prepare("SELECT d.push_sent_at,d.app_received_at,d.notification_shown_at,d.response,d.response_at,d.last_error,s.crew_name,s.device_id,s.person_id,COALESCE(p.display_name,s.crew_name) AS person_name,COALESCE(r.name,'Rolle ikke angivet') AS role_name,COALESCE(sm.role_status,'unverified') AS role_status,COALESCE((SELECT group_concat(c.name,' · ') FROM person_competencies pc JOIN competencies c ON c.id=pc.competency_id WHERE pc.person_id=s.person_id),'') AS competency_names FROM deliveries d JOIN subscriptions s ON s.id=d.subscription_id LEFT JOIN people p ON p.id=s.person_id LEFT JOIN station_memberships sm ON sm.person_id=s.person_id AND sm.station_id=:station_id AND sm.active=1 LEFT JOIN roles r ON r.id=sm.role_id WHERE d.alarm_id=:alarm_id ORDER BY person_name,s.device_id");
+        $statement = $db->prepare("SELECT d.push_sent_at,d.app_received_at,d.notification_shown_at,d.response,d.response_at,d.last_error,s.crew_name,s.device_id,s.person_id,COALESCE(p.display_name,s.crew_name) AS person_name,COALESCE(r.id,'') AS role_id,COALESCE(r.name,'Rolle ikke angivet') AS role_name,COALESCE(r.crew_level,0) AS crew_level,COALESCE(sm.role_status,'unverified') AS role_status,COALESCE((SELECT group_concat(c.name,' · ') FROM person_competencies pc JOIN competencies c ON c.id=pc.competency_id WHERE pc.person_id=s.person_id),'') AS competency_names FROM deliveries d JOIN subscriptions s ON s.id=d.subscription_id LEFT JOIN people p ON p.id=s.person_id LEFT JOIN station_memberships sm ON sm.person_id=s.person_id AND sm.station_id=:station_id AND sm.active=1 LEFT JOIN roles r ON r.id=sm.role_id WHERE d.alarm_id=:alarm_id ORDER BY person_name,s.device_id");
         $statement->execute([':alarm_id' => $alarm['id'], ':station_id' => $alarm['station_id']]);
         respond(['ok' => true, 'alarm' => alarmPayload($alarm), 'deliveries' => $statement->fetchAll(), 'activeCount' => $activeCount]);
     }
@@ -357,17 +380,18 @@ function database(string $path): PDO
     $db->exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
     $db->exec('CREATE TABLE IF NOT EXISTS organizations (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1);');
     $db->exec('CREATE TABLE IF NOT EXISTS stations (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, short_name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, display_order INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(organization_id) REFERENCES organizations(id));');
-    $db->exec('CREATE TABLE IF NOT EXISTS vessels (id TEXT PRIMARY KEY, station_id TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, type TEXT NOT NULL, crew_required INTEGER NOT NULL DEFAULT 1, active INTEGER NOT NULL DEFAULT 1, FOREIGN KEY(station_id) REFERENCES stations(id));');
-    $db->exec('CREATE TABLE IF NOT EXISTS roles (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1);');
+    $db->exec('CREATE TABLE IF NOT EXISTS vessels (id TEXT PRIMARY KEY, station_id TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, type TEXT NOT NULL, crew_required INTEGER NOT NULL DEFAULT 1, crew_min INTEGER NOT NULL DEFAULT 1, crew_max INTEGER NOT NULL DEFAULT 1, active INTEGER NOT NULL DEFAULT 1, FOREIGN KEY(station_id) REFERENCES stations(id));');
+    $db->exec('CREATE TABLE IF NOT EXISTS roles (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, crew_level INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1);');
     $db->exec('CREATE TABLE IF NOT EXISTS competencies (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1);');
     $db->exec('CREATE TABLE IF NOT EXISTS people (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, name_key TEXT NOT NULL, display_name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(organization_id,name_key), FOREIGN KEY(organization_id) REFERENCES organizations(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS person_identities (id INTEGER PRIMARY KEY AUTOINCREMENT, person_id TEXT NOT NULL, provider TEXT NOT NULL, tenant_id TEXT NOT NULL DEFAULT \'\', external_subject TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(provider,tenant_id,external_subject), FOREIGN KEY(person_id) REFERENCES people(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS station_memberships (id INTEGER PRIMARY KEY AUTOINCREMENT, person_id TEXT NOT NULL, station_id TEXT NOT NULL, role_id TEXT NOT NULL, role_status TEXT NOT NULL DEFAULT \'unverified\', active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(person_id,station_id), FOREIGN KEY(person_id) REFERENCES people(id), FOREIGN KEY(station_id) REFERENCES stations(id), FOREIGN KEY(role_id) REFERENCES roles(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS person_competencies (person_id TEXT NOT NULL, competency_id TEXT NOT NULL, verification_status TEXT NOT NULL DEFAULT \'self_declared\', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(person_id,competency_id), FOREIGN KEY(person_id) REFERENCES people(id), FOREIGN KEY(competency_id) REFERENCES competencies(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS vessel_competency_requirements (vessel_id TEXT NOT NULL, competency_id TEXT NOT NULL, required_count INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(vessel_id,competency_id), FOREIGN KEY(vessel_id) REFERENCES vessels(id), FOREIGN KEY(competency_id) REFERENCES competencies(id));');
+    $db->exec('CREATE TABLE IF NOT EXISTS vessel_crew_requirements (vessel_id TEXT NOT NULL, seat_role_id TEXT NOT NULL, minimum_count INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(vessel_id,seat_role_id), FOREIGN KEY(vessel_id) REFERENCES vessels(id), FOREIGN KEY(seat_role_id) REFERENCES roles(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS coordinators (id TEXT PRIMARY KEY, station_id TEXT NOT NULL, name TEXT NOT NULL, phone TEXT NOT NULL, latitude REAL NOT NULL, longitude REAL NOT NULL, is_test INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(station_id) REFERENCES stations(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, endpoint TEXT NOT NULL UNIQUE, subscription_json TEXT NOT NULL, device_id TEXT NOT NULL, device_token_hash TEXT NOT NULL, crew_name TEXT NOT NULL, station TEXT NOT NULL, station_id TEXT, person_id TEXT, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_seen_at TEXT);');
-    $db->exec('CREATE TABLE IF NOT EXISTS alarms (id TEXT PRIMARY KEY, station_id TEXT, coordinator_id TEXT, coordinator_snapshot_json TEXT, latitude REAL, longitude REAL, position_source TEXT NOT NULL DEFAULT \'manual\', vessel_ids_json TEXT NOT NULL DEFAULT \'[]\', type TEXT NOT NULL, priority TEXT NOT NULL, location TEXT NOT NULL, message TEXT NOT NULL, units_json TEXT NOT NULL, created_at TEXT NOT NULL, created_by TEXT NOT NULL, completed_at TEXT, completed_by TEXT);');
+    $db->exec('CREATE TABLE IF NOT EXISTS alarms (id TEXT PRIMARY KEY, station_id TEXT, coordinator_id TEXT, coordinator_snapshot_json TEXT, latitude REAL, longitude REAL, position_source TEXT NOT NULL DEFAULT \'manual\', vessel_ids_json TEXT NOT NULL DEFAULT \'[]\', type TEXT NOT NULL, priority TEXT NOT NULL, location TEXT NOT NULL, message TEXT NOT NULL, units_json TEXT NOT NULL, auto_start_assistance INTEGER NOT NULL DEFAULT 0, assistance_started_at TEXT, assistance_started_by TEXT, selected_crew_json TEXT NOT NULL DEFAULT \'[]\', created_at TEXT NOT NULL, created_by TEXT NOT NULL, completed_at TEXT, completed_by TEXT);');
     $db->exec('CREATE TABLE IF NOT EXISTS deliveries (id INTEGER PRIMARY KEY AUTOINCREMENT, alarm_id TEXT NOT NULL, subscription_id INTEGER NOT NULL, delivery_token TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, push_sent_at TEXT, app_received_at TEXT, notification_shown_at TEXT, response TEXT, response_at TEXT, last_error TEXT, FOREIGN KEY(alarm_id) REFERENCES alarms(id), FOREIGN KEY(subscription_id) REFERENCES subscriptions(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, alarm_id TEXT, metadata_json TEXT NOT NULL, created_at TEXT NOT NULL);');
 
@@ -380,7 +404,16 @@ function database(string $path): PDO
     if (!in_array('latitude', $alarmColumns, true)) $db->exec('ALTER TABLE alarms ADD COLUMN latitude REAL');
     if (!in_array('longitude', $alarmColumns, true)) $db->exec('ALTER TABLE alarms ADD COLUMN longitude REAL');
     if (!in_array('position_source', $alarmColumns, true)) $db->exec("ALTER TABLE alarms ADD COLUMN position_source TEXT NOT NULL DEFAULT 'manual'");
+    if (!in_array('auto_start_assistance', $alarmColumns, true)) $db->exec('ALTER TABLE alarms ADD COLUMN auto_start_assistance INTEGER NOT NULL DEFAULT 0');
+    if (!in_array('assistance_started_at', $alarmColumns, true)) $db->exec('ALTER TABLE alarms ADD COLUMN assistance_started_at TEXT');
+    if (!in_array('assistance_started_by', $alarmColumns, true)) $db->exec('ALTER TABLE alarms ADD COLUMN assistance_started_by TEXT');
+    if (!in_array('selected_crew_json', $alarmColumns, true)) $db->exec("ALTER TABLE alarms ADD COLUMN selected_crew_json TEXT NOT NULL DEFAULT '[]'");
     if (!in_array('vessel_ids_json', $alarmColumns, true)) $db->exec("ALTER TABLE alarms ADD COLUMN vessel_ids_json TEXT NOT NULL DEFAULT '[]'");
+    $vesselColumns = array_column($db->query('PRAGMA table_info(vessels)')->fetchAll(), 'name');
+    if (!in_array('crew_min', $vesselColumns, true)) $db->exec('ALTER TABLE vessels ADD COLUMN crew_min INTEGER NOT NULL DEFAULT 1');
+    if (!in_array('crew_max', $vesselColumns, true)) $db->exec('ALTER TABLE vessels ADD COLUMN crew_max INTEGER NOT NULL DEFAULT 1');
+    $roleColumns = array_column($db->query('PRAGMA table_info(roles)')->fetchAll(), 'name');
+    if (!in_array('crew_level', $roleColumns, true)) $db->exec('ALTER TABLE roles ADD COLUMN crew_level INTEGER NOT NULL DEFAULT 0');
     $coordinatorColumns = array_column($db->query('PRAGMA table_info(coordinators)')->fetchAll(), 'name');
     if (!in_array('is_test', $coordinatorColumns, true)) $db->exec('ALTER TABLE coordinators ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0');
     $subscriptionColumns = array_column($db->query('PRAGMA table_info(subscriptions)')->fetchAll(), 'name');
@@ -409,14 +442,19 @@ function database(string $path): PDO
     $db->prepare('INSERT OR IGNORE INTO coordinators(id,station_id,name,phone,latitude,longitude,is_test,active,created_at,updated_at) VALUES(:id,:station_id,:name,:phone,:latitude,:longitude,1,1,:created_at,:updated_at)')->execute([
         ':id' => 'coordinator-test-koege', ':station_id' => 'station-koege', ':name' => 'Koordinator Køge', ':phone' => '+45 00 00 00 00', ':latitude' => 55.45830, ':longitude' => 12.18330, ':created_at' => '2026-11-06T09:00:00Z', ':updated_at' => '2026-11-06T09:00:00Z',
     ]);
-    $vesselInsert = $db->prepare('INSERT OR IGNORE INTO vessels(id,station_id,slug,name,type,crew_required,active) VALUES(:id,:station_id,:slug,:name,:type,:crew_required,1)');
-    $vesselInsert->execute([':id' => 'vessel-rs-koege', ':station_id' => 'station-koege', ':slug' => 'rs-koege', ':name' => 'RS Køge', ':type' => 'Redningsfartøj', ':crew_required' => 4]);
-    $vesselInsert->execute([':id' => 'vessel-rhib-01', ':station_id' => 'station-koege', ':slug' => 'rhib-01', ':name' => 'RHIB 01', ':type' => 'RHIB', ':crew_required' => 2]);
+    $vesselInsert = $db->prepare('INSERT OR IGNORE INTO vessels(id,station_id,slug,name,type,crew_required,crew_min,crew_max,active) VALUES(:id,:station_id,:slug,:name,:type,:crew_required,:crew_min,:crew_max,1)');
+    $vesselInsert->execute([':id' => 'vessel-rs-koege', ':station_id' => 'station-koege', ':slug' => 'rs-koege', ':name' => 'RS Køge', ':type' => 'Redningsfartøj', ':crew_required' => 4, ':crew_min' => 4, ':crew_max' => 6]);
+    $vesselInsert->execute([':id' => 'vessel-rhib-01', ':station_id' => 'station-koege', ':slug' => 'rhib-01', ':name' => 'RHIB 01', ':type' => 'RHIB', ':crew_required' => 2, ':crew_min' => 2, ':crew_max' => 4]);
+    $db->exec("UPDATE vessels SET crew_min=4,crew_max=6 WHERE id='vessel-rs-koege'; UPDATE vessels SET crew_min=2,crew_max=4 WHERE id='vessel-rhib-01';");
 
-    $roleInsert = $db->prepare('INSERT OR IGNORE INTO roles(id,code,name,active) VALUES(:id,:code,:name,1)');
+    $roleInsert = $db->prepare('INSERT OR IGNORE INTO roles(id,code,name,crew_level,active) VALUES(:id,:code,:name,:crew_level,1)');
     foreach ([
-        ['role-crew','crew','Besætningsmedlem'],['role-rescuer','rescuer','Søredder'],['role-boatmaster','boatmaster','Bådfører'],['role-navigator','navigator','Navigatør'],['role-medic','medic','Førstehjælper'],['role-engineer','engineer','Maskinansvarlig'],['role-station-lead','station-lead','Stationsleder'],
-    ] as [$id,$code,$name]) $roleInsert->execute([':id' => $id, ':code' => $code, ':name' => $name]);
+        ['role-trainee','trainee','Aspirant',1],['role-rescuer-assistant','rescuer-assistant','Redderassistent',2],['role-rescuer','rescuer','Redder',3],['role-boatmaster','boatmaster','Bådfører',4],['role-crew','crew','Besætningsmedlem',1],['role-navigator','navigator','Navigatør',3],['role-medic','medic','Førstehjælper',3],['role-engineer','engineer','Maskinansvarlig',3],['role-station-lead','station-lead','Stationsleder',0],
+    ] as [$id,$code,$name,$crewLevel]) $roleInsert->execute([':id' => $id, ':code' => $code, ':name' => $name, ':crew_level' => $crewLevel]);
+    foreach ([['role-trainee',1],['role-rescuer-assistant',2],['role-rescuer',3],['role-boatmaster',4],['role-crew',1],['role-navigator',3],['role-medic',3],['role-engineer',3],['role-station-lead',0]] as [$roleId,$crewLevel]) $db->prepare('UPDATE roles SET crew_level=:crew_level WHERE id=:id')->execute([':crew_level' => $crewLevel, ':id' => $roleId]);
+    $db->exec("UPDATE roles SET name='Redder' WHERE id='role-rescuer'");
+    $crewRequirementInsert = $db->prepare('INSERT OR REPLACE INTO vessel_crew_requirements(vessel_id,seat_role_id,minimum_count) VALUES(:vessel_id,:seat_role_id,:minimum_count)');
+    foreach ([['vessel-rs-koege','role-boatmaster',1],['vessel-rs-koege','role-rescuer',2],['vessel-rs-koege','role-rescuer-assistant',1],['vessel-rhib-01','role-boatmaster',1],['vessel-rhib-01','role-rescuer',1]] as [$vesselId,$seatRoleId,$minimumCount]) $crewRequirementInsert->execute([':vessel_id' => $vesselId, ':seat_role_id' => $seatRoleId, ':minimum_count' => $minimumCount]);
     $competencyInsert = $db->prepare('INSERT OR IGNORE INTO competencies(id,code,name,active) VALUES(:id,:code,:name,1)');
     foreach ([
         ['competency-vhf-src','vhf-src','VHF/SRC'],['competency-first-aid','first-aid','Førstehjælp'],['competency-boatmaster','boatmaster','Bådfører'],['competency-navigation','navigation','Navigation'],['competency-engine','engine','Maskinansvarlig'],['competency-local-water','local-water','Lokalkendskab'],
@@ -474,8 +512,9 @@ function requireDevice(PDO $db): array
 function alarmPayload(array $row, ?string $deliveryToken = null): array
 {
     $coordinator = json_decode((string) ($row['coordinator_snapshot_json'] ?? ''), true);
+    $selectedCrew = json_decode((string) ($row['selected_crew_json'] ?? '[]'), true);
     $hasPosition = isset($row['latitude'], $row['longitude']) && is_numeric($row['latitude']) && is_numeric($row['longitude']);
-    $payload = ['id' => $row['id'], 'stationId' => $row['station_id'] ?? 'station-koege', 'stationName' => $row['station_name'] ?? 'DSRS Køge', 'coordinator' => is_array($coordinator) ? $coordinator : null, 'position' => $hasPosition ? ['latitude' => (float) $row['latitude'], 'longitude' => (float) $row['longitude'], 'source' => $row['position_source'] ?? 'manual'] : null, 'vesselIds' => json_decode((string) ($row['vessel_ids_json'] ?? '[]'), true) ?: [], 'type' => $row['type'], 'priority' => $row['priority'], 'location' => $row['location'], 'message' => $row['message'], 'units' => json_decode($row['units_json'], true) ?: [], 'createdAt' => $row['created_at']];
+    $payload = ['id' => $row['id'], 'stationId' => $row['station_id'] ?? 'station-koege', 'stationName' => $row['station_name'] ?? 'DSRS Køge', 'coordinator' => is_array($coordinator) ? $coordinator : null, 'position' => $hasPosition ? ['latitude' => (float) $row['latitude'], 'longitude' => (float) $row['longitude'], 'source' => $row['position_source'] ?? 'manual'] : null, 'vesselIds' => json_decode((string) ($row['vessel_ids_json'] ?? '[]'), true) ?: [], 'type' => $row['type'], 'priority' => $row['priority'], 'location' => $row['location'], 'message' => $row['message'], 'units' => json_decode($row['units_json'], true) ?: [], 'autoStartAssistance' => !empty($row['auto_start_assistance']), 'assistanceStartedAt' => $row['assistance_started_at'] ?? null, 'assistanceStartedBy' => $row['assistance_started_by'] ?? null, 'selectedCrew' => is_array($selectedCrew) ? $selectedCrew : [], 'createdAt' => $row['created_at']];
     if ($deliveryToken !== null) $payload['deliveryToken'] = $deliveryToken;
     return $payload;
 }
@@ -487,7 +526,7 @@ function coordinatorPayload(array $row): array
 
 function crewProfileOptions(PDO $db): array
 {
-    $roles = array_map(static fn(array $row): array => ['id' => $row['id'], 'name' => $row['name']], $db->query('SELECT id,name FROM roles WHERE active=1 ORDER BY name')->fetchAll());
+    $roles = array_map(static fn(array $row): array => ['id' => $row['id'], 'name' => $row['name'], 'crewLevel' => (int) $row['crew_level']], $db->query('SELECT id,name,crew_level FROM roles WHERE active=1 ORDER BY crew_level,name')->fetchAll());
     $competencies = array_map(static fn(array $row): array => ['id' => $row['id'], 'name' => $row['name']], $db->query('SELECT id,name FROM competencies WHERE active=1 ORDER BY name')->fetchAll());
     return ['roles' => $roles, 'competencies' => $competencies, 'verification' => 'self_declared'];
 }
@@ -546,7 +585,7 @@ function ensureCrewProfile(PDO $db, string $crewName, string $stationId, string 
 
 function personProfile(PDO $db, string $personId, string $stationId): array
 {
-    $statement = $db->prepare("SELECT p.id,p.display_name,r.id AS role_id,r.name AS role_name,sm.role_status FROM people p JOIN station_memberships sm ON sm.person_id=p.id AND sm.station_id=:station_id AND sm.active=1 JOIN roles r ON r.id=sm.role_id WHERE p.id=:person_id AND p.active=1 LIMIT 1");
+    $statement = $db->prepare("SELECT p.id,p.display_name,r.id AS role_id,r.name AS role_name,r.crew_level,sm.role_status FROM people p JOIN station_memberships sm ON sm.person_id=p.id AND sm.station_id=:station_id AND sm.active=1 JOIN roles r ON r.id=sm.role_id WHERE p.id=:person_id AND p.active=1 LIMIT 1");
     $statement->execute([':station_id' => $stationId, ':person_id' => $personId]);
     $person = $statement->fetch();
     if (!$person) respond(['ok' => false, 'error' => 'Personprofilen kunne ikke oprettes.'], 500);
@@ -555,7 +594,7 @@ function personProfile(PDO $db, string $personId, string $stationId): array
     return [
         'id' => $person['id'],
         'name' => $person['display_name'],
-        'role' => ['id' => $person['role_id'], 'name' => $person['role_name'], 'verificationStatus' => $person['role_status']],
+        'role' => ['id' => $person['role_id'], 'name' => $person['role_name'], 'crewLevel' => (int) $person['crew_level'], 'verificationStatus' => $person['role_status']],
         'competencies' => array_map(static fn(array $row): array => ['id' => $row['id'], 'name' => $row['name'], 'verificationStatus' => $row['verification_status']], $competencyStatement->fetchAll()),
     ];
 }
@@ -563,21 +602,117 @@ function personProfile(PDO $db, string $personId, string $stationId): array
 function publicStations(PDO $db): array
 {
     $stations = $db->query('SELECT id,slug,name,short_name FROM stations WHERE active=1 ORDER BY display_order,name')->fetchAll();
-    $vesselStatement = $db->prepare('SELECT id,slug,name,type,crew_required FROM vessels WHERE station_id=:station_id AND active=1 ORDER BY name');
+    $vesselStatement = $db->prepare('SELECT id,slug,name,type,crew_required,crew_min,crew_max FROM vessels WHERE station_id=:station_id AND active=1 ORDER BY name');
+    $requirementStatement = $db->prepare('SELECT vcr.seat_role_id,r.name AS role_name,r.crew_level,vcr.minimum_count FROM vessel_crew_requirements vcr JOIN roles r ON r.id=vcr.seat_role_id WHERE vcr.vessel_id=:vessel_id ORDER BY r.crew_level DESC,r.name');
     foreach ($stations as &$station) {
         $vesselStatement->execute([':station_id' => $station['id']]);
-        $station['vessels'] = array_map(static fn(array $vessel): array => [
-            'id' => $vessel['id'],
-            'slug' => $vessel['slug'],
-            'name' => $vessel['name'],
-            'type' => $vessel['type'],
-            'crewRequired' => (int) $vessel['crew_required'],
-        ], $vesselStatement->fetchAll());
+        $station['vessels'] = [];
+        foreach ($vesselStatement->fetchAll() as $vessel) {
+            $requirementStatement->execute([':vessel_id' => $vessel['id']]);
+            $station['vessels'][] = [
+                'id' => $vessel['id'], 'slug' => $vessel['slug'], 'name' => $vessel['name'], 'type' => $vessel['type'], 'crewRequired' => (int) $vessel['crew_required'], 'crewMin' => (int) $vessel['crew_min'], 'crewMax' => (int) $vessel['crew_max'],
+                'seatRequirements' => array_map(static fn(array $row): array => ['roleId' => $row['seat_role_id'], 'roleName' => $row['role_name'], 'crewLevel' => (int) $row['crew_level'], 'minimumCount' => (int) $row['minimum_count']], $requirementStatement->fetchAll()),
+            ];
+        }
         $station['shortName'] = $station['short_name'];
         unset($station['short_name']);
     }
     unset($station);
     return $stations;
+}
+
+function acceptedCrewCandidates(PDO $db, string $alarmId): array
+{
+    $statement = $db->prepare("SELECT p.id AS person_id,p.display_name,r.id AS role_id,r.name AS role_name,r.crew_level FROM deliveries d JOIN subscriptions s ON s.id=d.subscription_id JOIN people p ON p.id=s.person_id AND p.active=1 JOIN alarms a ON a.id=d.alarm_id JOIN station_memberships sm ON sm.person_id=p.id AND sm.station_id=a.station_id AND sm.active=1 JOIN roles r ON r.id=sm.role_id AND r.active=1 WHERE d.alarm_id=:alarm_id AND d.response='accepted' GROUP BY p.id,p.display_name,r.id,r.name,r.crew_level ORDER BY r.crew_level,p.display_name");
+    $statement->execute([':alarm_id' => $alarmId]);
+    return array_map(static fn(array $row): array => ['personId' => $row['person_id'], 'personName' => $row['display_name'], 'roleId' => $row['role_id'], 'roleName' => $row['role_name'], 'crewLevel' => (int) $row['crew_level']], $statement->fetchAll());
+}
+
+function buildServerCrewPlan(PDO $db, array $alarm, array $requestedPersonIds, bool $automatic): array
+{
+    $vesselIds = json_decode((string) ($alarm['vessel_ids_json'] ?? '[]'), true) ?: [];
+    if ($vesselIds === []) return ['ok' => false, 'error' => 'Alarmen har intet fartøj med en bemandingsprofil.'];
+    $placeholders = implode(',', array_fill(0, count($vesselIds), '?'));
+    $vesselStatement = $db->prepare("SELECT id,name,crew_min,crew_max FROM vessels WHERE active=1 AND id IN ($placeholders)");
+    $vesselStatement->execute($vesselIds);
+    $vessels = $vesselStatement->fetchAll();
+    if (count($vessels) !== count($vesselIds)) return ['ok' => false, 'error' => 'Et valgt fartøj mangler en aktiv bemandingsprofil.'];
+    $minimum = array_sum(array_map(static fn(array $row): int => (int) $row['crew_min'], $vessels));
+    $maximum = array_sum(array_map(static fn(array $row): int => (int) $row['crew_max'], $vessels));
+    $allCandidates = acceptedCrewCandidates($db, (string) $alarm['id']);
+    $candidateById = [];
+    foreach ($allCandidates as $candidate) $candidateById[$candidate['personId']] = $candidate;
+    if ($automatic) {
+        $candidates = array_values(array_filter($candidateById, static fn(array $candidate): bool => $candidate['crewLevel'] >= 1));
+    } else {
+        $candidates = [];
+        foreach ($requestedPersonIds as $personId) {
+            if (!isset($candidateById[$personId])) return ['ok' => false, 'error' => 'En valgt person har ikke accepteret alarmen eller mangler en aktiv rolle.'];
+            if ($candidateById[$personId]['crewLevel'] < 1) return ['ok' => false, 'error' => 'En valgt person har ikke en godkendt bådrolle.'];
+            $candidates[] = $candidateById[$personId];
+        }
+    }
+    if (count($candidates) < $minimum) return ['ok' => false, 'error' => 'Der er ikke nok accepterede til minimumsbesætningen på ' . $minimum . '.'];
+    if (!$automatic && count($candidates) > $maximum) return ['ok' => false, 'error' => 'Den valgte besætning overstiger fartøjernes maksimum på ' . $maximum . '.'];
+    usort($candidates, static fn(array $a, array $b): int => ($a['crewLevel'] <=> $b['crewLevel']) ?: strcasecmp($a['personName'], $b['personName']));
+    $requirementStatement = $db->prepare('SELECT vcr.seat_role_id,r.name AS seat_role_name,r.crew_level,vcr.minimum_count FROM vessel_crew_requirements vcr JOIN roles r ON r.id=vcr.seat_role_id WHERE vcr.vessel_id=:vessel_id ORDER BY r.crew_level DESC');
+    $seats = [];
+    foreach ($vessels as $vessel) {
+        $requirementStatement->execute([':vessel_id' => $vessel['id']]);
+        foreach ($requirementStatement->fetchAll() as $requirement) for ($index = 0; $index < (int) $requirement['minimum_count']; $index++) $seats[] = ['vesselId' => $vessel['id'], 'vesselName' => $vessel['name'], 'seatRoleId' => $requirement['seat_role_id'], 'seatRoleName' => $requirement['seat_role_name'], 'requiredLevel' => (int) $requirement['crew_level']];
+    }
+    usort($seats, static fn(array $a, array $b): int => $b['requiredLevel'] <=> $a['requiredLevel']);
+    $available = $candidates;
+    $assignments = [];
+    foreach ($seats as $seat) {
+        $candidateIndex = null;
+        foreach ($available as $index => $candidate) if ($candidate['crewLevel'] >= $seat['requiredLevel']) { $candidateIndex = $index; break; }
+        if ($candidateIndex === null) return ['ok' => false, 'error' => 'Mangler kvalificeret ' . $seat['seatRoleName'] . ' til ' . $seat['vesselName'] . '.'];
+        $candidate = $available[$candidateIndex];
+        array_splice($available, $candidateIndex, 1);
+        $assignments[] = array_merge($seat, $candidate);
+    }
+    $targetCount = $automatic ? $minimum : count($candidates);
+    $vesselCounts = [];
+    foreach ($vessels as $vessel) $vesselCounts[$vessel['id']] = count(array_filter($assignments, static fn(array $assignment): bool => $assignment['vesselId'] === $vessel['id']));
+    while (count($assignments) < $targetCount && $available !== []) {
+        $candidate = array_shift($available);
+        $targetVessel = null;
+        foreach ($vessels as $vessel) if (($vesselCounts[$vessel['id']] ?? 0) < (int) $vessel['crew_min']) { $targetVessel = $vessel; break; }
+        if (!$targetVessel) foreach ($vessels as $vessel) if (($vesselCounts[$vessel['id']] ?? 0) < (int) $vessel['crew_max']) { $targetVessel = $vessel; break; }
+        if (!$targetVessel) break;
+        $vesselCounts[$targetVessel['id']]++;
+        $assignments[] = array_merge(['vesselId' => $targetVessel['id'], 'vesselName' => $targetVessel['name'], 'seatRoleId' => 'extra', 'seatRoleName' => 'Ekstra besætning', 'requiredLevel' => 1], $candidate);
+    }
+    foreach ($vessels as $vessel) if (($vesselCounts[$vessel['id']] ?? 0) < (int) $vessel['crew_min']) return ['ok' => false, 'error' => 'Minimumsbesætningen kunne ikke fordeles sikkert på alle valgte fartøjer.'];
+    return ['ok' => true, 'assignments' => $assignments, 'minimum' => $minimum, 'maximum' => $maximum];
+}
+
+function startAssistanceWithCrew(PDO $db, string $alarmId, array $personIds, string $startedBy): array
+{
+    $statement = $db->prepare('SELECT * FROM alarms WHERE id=:id AND completed_at IS NULL LIMIT 1');
+    $statement->execute([':id' => $alarmId]);
+    $alarm = $statement->fetch();
+    if (!$alarm) return ['ok' => false, 'error' => 'Den aktive alarm findes ikke.'];
+    if (!empty($alarm['assistance_started_at'])) return ['ok' => true, 'assignments' => json_decode((string) $alarm['selected_crew_json'], true) ?: []];
+    $plan = buildServerCrewPlan($db, $alarm, $personIds, $startedBy === 'auto');
+    if (!$plan['ok']) return $plan;
+    $startedAt = now();
+    $update = $db->prepare('UPDATE alarms SET assistance_started_at=:started_at,assistance_started_by=:started_by,selected_crew_json=:selected_crew WHERE id=:id AND assistance_started_at IS NULL AND completed_at IS NULL');
+    $update->execute([':started_at' => $startedAt, ':started_by' => $startedBy, ':selected_crew' => json_encode($plan['assignments'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), ':id' => $alarmId]);
+    if ($update->rowCount() === 1) audit($db, 'assistance_started', $alarmId, ['startedBy' => $startedBy, 'crewCount' => count($plan['assignments']), 'minimum' => $plan['minimum'], 'maximum' => $plan['maximum']]);
+    return ['ok' => true, 'assignments' => $plan['assignments']];
+}
+
+function tryAutoStartAssistance(PDO $db, string $alarmId): bool
+{
+    $statement = $db->prepare('SELECT auto_start_assistance,assistance_started_at FROM alarms WHERE id=:id AND completed_at IS NULL LIMIT 1');
+    $statement->execute([':id' => $alarmId]);
+    $alarm = $statement->fetch();
+    if (!$alarm || empty($alarm['auto_start_assistance']) || !empty($alarm['assistance_started_at'])) return false;
+    $personIds = array_map(static fn(array $candidate): string => $candidate['personId'], acceptedCrewCandidates($db, $alarmId));
+    $result = startAssistanceWithCrew($db, $alarmId, $personIds, 'auto');
+    return !empty($result['ok']);
 }
 
 function deliveryPayload(array $row): array
