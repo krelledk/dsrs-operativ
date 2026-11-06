@@ -1,5 +1,5 @@
-const CACHE='dsrs-operativ-v28';
-const APP_SHELL=['./','index.html','vendor/leaflet/leaflet.css','vendor/leaflet/leaflet.js','styles.css?v=28','crew.css?v=28','app.js?v=28','version.json','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
+const CACHE='dsrs-operativ-v29';
+const APP_SHELL=['./','index.html','vendor/leaflet/leaflet.css','vendor/leaflet/leaflet.js','styles.css?v=29','crew.css?v=29','app.js?v=29','version.json','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
 
 self.addEventListener('install',event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting())
@@ -33,7 +33,7 @@ self.addEventListener('push',event=>{
     await self.registration.showNotification(payload.title,{body:payload.body,icon:'icon-192.png',badge:'icon-192.png',tag:payload.tag||'dsrs-sar-alarm',renotify:true,requireInteraction:true,silent:false,vibrate:[700,220,700,220,1100],timestamp:Date.now(),data:{url:payload.url||'./#responder'}});
     if('setAppBadge'in self.registration)await self.registration.setAppBadge(1).catch(()=>null);
     await receipt('shown');
-    const windows=await clients.matchAll({type:'window',includeUncontrolled:true});for(const client of windows)client.postMessage({type:'push-alarm',payload});
+    const messageType=payload.crewSelection?'crew-selection':'push-alarm';const windows=await clients.matchAll({type:'window',includeUncontrolled:true});for(const client of windows)client.postMessage({type:messageType,payload});
   })());
 });
 

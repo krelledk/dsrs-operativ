@@ -15,8 +15,8 @@
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=28">
-  <link rel="stylesheet" href="crew.css?v=28">
+  <link rel="stylesheet" href="styles.css?v=29">
+  <link rel="stylesheet" href="crew.css?v=29">
 </head>
 <body>
   <div class="shell">
@@ -82,6 +82,14 @@
             <small>VHF 16 · JRCC link klar</small>
           </article>
         </div>
+
+        <section class="operation-stages" id="operation-stages" aria-label="Alarmens operative forløb">
+          <article class="operation-stage" id="stage-alarm"><span>1</span><div><small>TRIN 1</small><b>Alarm startet</b><p id="stage-alarm-detail">Klar til ny alarm</p></div></article>
+          <i aria-hidden="true"></i>
+          <article class="operation-stage" id="stage-crew"><span>2</span><div><small>TRIN 2</small><b>Afventer besætning</b><p id="stage-crew-detail">Afventer alarm</p></div></article>
+          <i aria-hidden="true"></i>
+          <article class="operation-stage" id="stage-assistance"><span>3</span><div><small>TRIN 3</small><b>Assistance startet</b><p id="stage-assistance-detail">Ikke startet</p></div></article>
+        </section>
 
         <div class="control-grid">
           <section class="panel dispatch-panel">
@@ -421,6 +429,6 @@
     </form>
   </dialog>
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="app.js?v=28"></script>
+<script src="app.js?v=29"></script>
 </body>
 </html>

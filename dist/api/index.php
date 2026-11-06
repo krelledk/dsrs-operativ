@@ -40,11 +40,11 @@ $method = (string) $_SERVER['REQUEST_METHOD'];
 
 try {
     if ($action === 'health' && $method === 'GET') {
-        respond(['ok' => true, 'service' => 'DSRS SAR pilotbackend', 'version' => '0.7.0', 'time' => now()]);
+        respond(['ok' => true, 'service' => 'DSRS SAR pilotbackend', 'version' => '0.8.0', 'time' => now()]);
     }
 
     if ($action === 'config' && $method === 'GET') {
-        respond(['ok' => true, 'vapidPublicKey' => $config['vapid_public'], 'backendVersion' => '0.7.0', 'testResponderCount' => testResponderCount($db), 'stations' => publicStations($db), 'crewProfile' => crewProfileOptions($db)]);
+        respond(['ok' => true, 'vapidPublicKey' => $config['vapid_public'], 'backendVersion' => '0.8.0', 'testResponderCount' => testResponderCount($db), 'stations' => publicStations($db), 'crewProfile' => crewProfileOptions($db)]);
     }
 
     if ($action === 'session' && $method === 'GET') {
@@ -201,7 +201,7 @@ try {
             $db->prepare('UPDATE deliveries SET app_received_at=COALESCE(app_received_at,:now), notification_shown_at=COALESCE(notification_shown_at,:now) WHERE id=:id')->execute([':now' => now(), ':id' => $delivery['id']]);
         } elseif ($stage === 'response' && in_array($response, ['accepted', 'rejected'], true)) {
             $db->prepare('UPDATE deliveries SET response=:response, response_at=:now WHERE id=:id')->execute([':response' => $response, ':now' => now(), ':id' => $delivery['id']]);
-            if ($response === 'accepted') $assistanceStarted = tryAutoStartAssistance($db, (string) $delivery['alarm_id']);
+            if ($response === 'accepted') $assistanceStarted = tryAutoStartAssistance($db, $config, (string) $delivery['alarm_id']);
         } else {
             respond(['ok' => false, 'error' => 'Ugyldig kvittering.'], 422);
         }
@@ -340,11 +340,11 @@ try {
         $alarmId = clean((string) ($body['alarmId'] ?? ''), 100);
         $personIds = array_values(array_unique(array_slice(array_filter(array_map(fn($value) => clean((string) $value, 100), (array) ($body['personIds'] ?? []))), 0, 30)));
         if ($alarmId === '' || $personIds === []) respond(['ok' => false, 'error' => 'Vælg den besætning, der skal starte assistancen.'], 422);
-        $result = startAssistanceWithCrew($db, $alarmId, $personIds, 'control');
+        $result = startAssistanceWithCrew($db, $config, $alarmId, $personIds, 'control');
         if (!$result['ok']) respond(['ok' => false, 'error' => $result['error']], 422);
         $alarmStatement = $db->prepare('SELECT a.*,s.name AS station_name FROM alarms a LEFT JOIN stations s ON s.id=a.station_id WHERE a.id=:id LIMIT 1');
         $alarmStatement->execute([':id' => $alarmId]);
-        respond(['ok' => true, 'alarm' => alarmPayload($alarmStatement->fetch())]);
+        respond(['ok' => true, 'alarm' => alarmPayload($alarmStatement->fetch()), 'selectionNotifications' => $result['selectionNotifications'] ?? ['sent' => 0, 'failed' => 0]]);
     }
 
     if ($action === 'status' && $method === 'GET') {
@@ -356,12 +356,12 @@ try {
         $activeCount = (int) $db->query('SELECT COUNT(*) FROM alarms WHERE completed_at IS NULL')->fetchColumn();
         if (!$alarm) respond(['ok' => true, 'alarm' => null, 'deliveries' => [], 'activeCount' => $activeCount]);
         $acceptedTestResponses = advanceTestDeliveries($db, (string) $alarm['id']);
-        if ($acceptedTestResponses > 0) tryAutoStartAssistance($db, (string) $alarm['id']);
+        if ($acceptedTestResponses > 0) tryAutoStartAssistance($db, $config, (string) $alarm['id']);
         if ($acceptedTestResponses > 0) {
             $alarmStatement->execute([':station_id' => $stationId]);
             $alarm = $alarmStatement->fetch();
         }
-        $statement = $db->prepare("SELECT d.push_sent_at,d.app_received_at,d.notification_shown_at,d.response,d.response_at,d.last_error,s.crew_name,s.device_id,s.person_id,COALESCE(s.is_test,0) AS is_test_responder,s.test_behavior,COALESCE(p.display_name,s.crew_name) AS person_name,COALESCE(r.id,'') AS role_id,COALESCE(r.name,'Rolle ikke angivet') AS role_name,COALESCE(r.crew_level,0) AS crew_level,COALESCE(sm.role_status,'unverified') AS role_status,COALESCE((SELECT group_concat(c.name,' · ') FROM person_competencies pc JOIN competencies c ON c.id=pc.competency_id WHERE pc.person_id=s.person_id),'') AS competency_names FROM deliveries d JOIN subscriptions s ON s.id=d.subscription_id LEFT JOIN people p ON p.id=s.person_id LEFT JOIN station_memberships sm ON sm.person_id=s.person_id AND sm.station_id=:station_id AND sm.active=1 LEFT JOIN roles r ON r.id=sm.role_id WHERE d.alarm_id=:alarm_id ORDER BY is_test_responder,person_name,s.device_id");
+        $statement = $db->prepare("SELECT d.push_sent_at,d.app_received_at,d.notification_shown_at,d.response,d.response_at,d.last_error,d.crew_selection,d.selection_push_sent_at,d.selection_last_error,s.crew_name,s.device_id,s.person_id,COALESCE(s.is_test,0) AS is_test_responder,s.test_behavior,COALESCE(p.display_name,s.crew_name) AS person_name,COALESCE(r.id,'') AS role_id,COALESCE(r.name,'Rolle ikke angivet') AS role_name,COALESCE(r.crew_level,0) AS crew_level,COALESCE(sm.role_status,'unverified') AS role_status,COALESCE((SELECT group_concat(c.name,' · ') FROM person_competencies pc JOIN competencies c ON c.id=pc.competency_id WHERE pc.person_id=s.person_id),'') AS competency_names FROM deliveries d JOIN subscriptions s ON s.id=d.subscription_id LEFT JOIN people p ON p.id=s.person_id LEFT JOIN station_memberships sm ON sm.person_id=s.person_id AND sm.station_id=:station_id AND sm.active=1 LEFT JOIN roles r ON r.id=sm.role_id WHERE d.alarm_id=:alarm_id ORDER BY is_test_responder,person_name,s.device_id");
         $statement->execute([':alarm_id' => $alarm['id'], ':station_id' => $alarm['station_id']]);
         respond(['ok' => true, 'alarm' => alarmPayload($alarm), 'deliveries' => $statement->fetchAll(), 'activeCount' => $activeCount]);
     }
@@ -412,7 +412,7 @@ function database(string $path): PDO
     $db->exec('CREATE TABLE IF NOT EXISTS coordinators (id TEXT PRIMARY KEY, station_id TEXT NOT NULL, name TEXT NOT NULL, phone TEXT NOT NULL, latitude REAL NOT NULL, longitude REAL NOT NULL, is_test INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(station_id) REFERENCES stations(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, endpoint TEXT NOT NULL UNIQUE, subscription_json TEXT NOT NULL, device_id TEXT NOT NULL, device_token_hash TEXT NOT NULL, crew_name TEXT NOT NULL, station TEXT NOT NULL, station_id TEXT, person_id TEXT, is_test INTEGER NOT NULL DEFAULT 0, test_response TEXT, test_delay_seconds INTEGER, test_behavior TEXT, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_seen_at TEXT);');
     $db->exec('CREATE TABLE IF NOT EXISTS alarms (id TEXT PRIMARY KEY, station_id TEXT, coordinator_id TEXT, coordinator_snapshot_json TEXT, latitude REAL, longitude REAL, position_source TEXT NOT NULL DEFAULT \'manual\', vessel_ids_json TEXT NOT NULL DEFAULT \'[]\', type TEXT NOT NULL, priority TEXT NOT NULL, location TEXT NOT NULL, message TEXT NOT NULL, units_json TEXT NOT NULL, auto_start_assistance INTEGER NOT NULL DEFAULT 0, test_responders_enabled INTEGER NOT NULL DEFAULT 0, assistance_started_at TEXT, assistance_started_by TEXT, selected_crew_json TEXT NOT NULL DEFAULT \'[]\', created_at TEXT NOT NULL, created_by TEXT NOT NULL, completed_at TEXT, completed_by TEXT);');
-    $db->exec('CREATE TABLE IF NOT EXISTS deliveries (id INTEGER PRIMARY KEY AUTOINCREMENT, alarm_id TEXT NOT NULL, subscription_id INTEGER NOT NULL, delivery_token TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, push_sent_at TEXT, app_received_at TEXT, notification_shown_at TEXT, response TEXT, response_at TEXT, last_error TEXT, FOREIGN KEY(alarm_id) REFERENCES alarms(id), FOREIGN KEY(subscription_id) REFERENCES subscriptions(id));');
+    $db->exec('CREATE TABLE IF NOT EXISTS deliveries (id INTEGER PRIMARY KEY AUTOINCREMENT, alarm_id TEXT NOT NULL, subscription_id INTEGER NOT NULL, delivery_token TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, push_sent_at TEXT, app_received_at TEXT, notification_shown_at TEXT, response TEXT, response_at TEXT, last_error TEXT, crew_selection TEXT, selection_push_sent_at TEXT, selection_last_error TEXT, FOREIGN KEY(alarm_id) REFERENCES alarms(id), FOREIGN KEY(subscription_id) REFERENCES subscriptions(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, alarm_id TEXT, metadata_json TEXT NOT NULL, created_at TEXT NOT NULL);');
 
     $alarmColumns = array_column($db->query('PRAGMA table_info(alarms)')->fetchAll(), 'name');
@@ -446,6 +446,10 @@ function database(string $path): PDO
     if (!in_array('test_response', $subscriptionColumns, true)) $db->exec('ALTER TABLE subscriptions ADD COLUMN test_response TEXT');
     if (!in_array('test_delay_seconds', $subscriptionColumns, true)) $db->exec('ALTER TABLE subscriptions ADD COLUMN test_delay_seconds INTEGER');
     if (!in_array('test_behavior', $subscriptionColumns, true)) $db->exec('ALTER TABLE subscriptions ADD COLUMN test_behavior TEXT');
+    $deliveryColumns = array_column($db->query('PRAGMA table_info(deliveries)')->fetchAll(), 'name');
+    if (!in_array('crew_selection', $deliveryColumns, true)) $db->exec('ALTER TABLE deliveries ADD COLUMN crew_selection TEXT');
+    if (!in_array('selection_push_sent_at', $deliveryColumns, true)) $db->exec('ALTER TABLE deliveries ADD COLUMN selection_push_sent_at TEXT');
+    if (!in_array('selection_last_error', $deliveryColumns, true)) $db->exec('ALTER TABLE deliveries ADD COLUMN selection_last_error TEXT');
 
     $db->prepare('INSERT OR IGNORE INTO organizations(id,slug,name,active) VALUES(:id,:slug,:name,1)')->execute([':id' => 'org-dsrs', ':slug' => 'dsrs', ':name' => 'Dansk Søredningsselskab']);
     $stations = [
@@ -771,36 +775,100 @@ function buildServerCrewPlan(PDO $db, array $alarm, array $requestedPersonIds, b
     return ['ok' => true, 'assignments' => $assignments, 'minimum' => $minimum, 'maximum' => $maximum];
 }
 
-function startAssistanceWithCrew(PDO $db, string $alarmId, array $personIds, string $startedBy): array
+function startAssistanceWithCrew(PDO $db, array $config, string $alarmId, array $personIds, string $startedBy): array
 {
     $statement = $db->prepare('SELECT * FROM alarms WHERE id=:id AND completed_at IS NULL LIMIT 1');
     $statement->execute([':id' => $alarmId]);
     $alarm = $statement->fetch();
     if (!$alarm) return ['ok' => false, 'error' => 'Den aktive alarm findes ikke.'];
-    if (!empty($alarm['assistance_started_at'])) return ['ok' => true, 'assignments' => json_decode((string) $alarm['selected_crew_json'], true) ?: []];
+    if (!empty($alarm['assistance_started_at'])) return ['ok' => true, 'startedNow' => false, 'assignments' => json_decode((string) $alarm['selected_crew_json'], true) ?: [], 'selectionNotifications' => ['sent' => 0, 'failed' => 0]];
     $plan = buildServerCrewPlan($db, $alarm, $personIds, $startedBy === 'auto');
     if (!$plan['ok']) return $plan;
     $startedAt = now();
     $update = $db->prepare('UPDATE alarms SET assistance_started_at=:started_at,assistance_started_by=:started_by,selected_crew_json=:selected_crew WHERE id=:id AND assistance_started_at IS NULL AND completed_at IS NULL');
     $update->execute([':started_at' => $startedAt, ':started_by' => $startedBy, ':selected_crew' => json_encode($plan['assignments'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), ':id' => $alarmId]);
-    if ($update->rowCount() === 1) audit($db, 'assistance_started', $alarmId, ['startedBy' => $startedBy, 'crewCount' => count($plan['assignments']), 'minimum' => $plan['minimum'], 'maximum' => $plan['maximum']]);
-    return ['ok' => true, 'assignments' => $plan['assignments']];
+    $startedNow = $update->rowCount() === 1;
+    $selectionNotifications = ['sent' => 0, 'failed' => 0, 'selected' => 0, 'notSelected' => 0];
+    if ($startedNow) {
+        audit($db, 'assistance_started', $alarmId, ['startedBy' => $startedBy, 'crewCount' => count($plan['assignments']), 'minimum' => $plan['minimum'], 'maximum' => $plan['maximum']]);
+        try {
+            $selectionNotifications = notifyCrewSelection($db, $config, $alarmId, $plan['assignments']);
+        } catch (Throwable $error) {
+            audit($db, 'crew_selection_notification_failed', $alarmId, ['error' => substr($error->getMessage(), 0, 300)]);
+            $selectionNotifications['failed'] = 1;
+        }
+    }
+    return ['ok' => true, 'startedNow' => $startedNow, 'assignments' => $plan['assignments'], 'selectionNotifications' => $selectionNotifications];
 }
 
-function tryAutoStartAssistance(PDO $db, string $alarmId): bool
+function notifyCrewSelection(PDO $db, array $config, string $alarmId, array $assignments): array
+{
+    $assignmentByPerson = [];
+    foreach ($assignments as $assignment) $assignmentByPerson[(string) $assignment['personId']] = $assignment;
+    $db->prepare("UPDATE deliveries SET crew_selection='not_selected',selection_push_sent_at=NULL,selection_last_error=NULL WHERE alarm_id=:alarm_id AND response='accepted'")->execute([':alarm_id' => $alarmId]);
+    $markSelected = $db->prepare("UPDATE deliveries SET crew_selection='selected' WHERE alarm_id=:alarm_id AND response='accepted' AND subscription_id IN (SELECT id FROM subscriptions WHERE person_id=:person_id)");
+    foreach (array_keys($assignmentByPerson) as $personId) $markSelected->execute([':alarm_id' => $alarmId, ':person_id' => $personId]);
+
+    $statement = $db->prepare("SELECT d.id AS delivery_id,d.crew_selection,s.id AS subscription_id,s.* FROM deliveries d JOIN subscriptions s ON s.id=d.subscription_id WHERE d.alarm_id=:alarm_id AND d.response='accepted' AND s.active=1 AND COALESCE(s.is_test,0)=0 ORDER BY d.id");
+    $statement->execute([':alarm_id' => $alarmId]);
+    $recipients = $statement->fetchAll();
+    $summary = ['sent' => 0, 'failed' => 0, 'selected' => 0, 'notSelected' => 0];
+    if ($recipients === []) {
+        audit($db, 'crew_selection_notifications_sent', $alarmId, $summary);
+        return $summary;
+    }
+    $webPush = new WebPush(['VAPID' => ['subject' => $config['vapid_subject'], 'publicKey' => $config['vapid_public'], 'privateKey' => $config['vapid_private']]], ['TTL' => 300, 'urgency' => 'high']);
+    $recipientByEndpoint = [];
+    foreach ($recipients as $recipient) {
+        $personId = (string) ($recipient['person_id'] ?? '');
+        $assignment = $assignmentByPerson[$personId] ?? null;
+        $selected = $assignment !== null;
+        $status = $selected ? 'selected' : 'not_selected';
+        $summary[$selected ? 'selected' : 'notSelected']++;
+        $title = $selected ? 'DSRS · DU ER UDTAGET' : 'DSRS · DU ER IKKE UDTAGET';
+        $body = $selected
+            ? 'Du er valgt som ' . $assignment['seatRoleName'] . ' på ' . $assignment['vesselName'] . '. Kør til stationen og følg landkoordinatorens besked.'
+            : 'Du meldte klar, men er ikke udtaget til denne assistance. Kør ikke til stationen, medmindre landkoordinatoren kontakter dig.';
+        $payload = ['title' => $title, 'body' => $body, 'tag' => $alarmId, 'url' => '/#responder?selection=1', 'crewSelection' => ['alarmId' => $alarmId, 'status' => $status, 'vesselName' => $assignment['vesselName'] ?? null, 'seatRoleName' => $assignment['seatRoleName'] ?? null]];
+        try {
+            $webPush->queueNotification(Subscription::create(json_decode($recipient['subscription_json'], true, 512, JSON_THROW_ON_ERROR)), json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), ['TTL' => 300, 'urgency' => 'high', 'topic' => substr(hash('sha256', 'selection-' . $alarmId), 0, 32)]);
+            $recipientByEndpoint[$recipient['endpoint']] = $recipient;
+        } catch (Throwable $error) {
+            $summary['failed']++;
+            $db->prepare('UPDATE deliveries SET selection_last_error=:error WHERE id=:id')->execute([':error' => substr($error->getMessage(), 0, 500), ':id' => $recipient['delivery_id']]);
+        }
+    }
+    foreach ($webPush->flush() as $report) {
+        $endpoint = (string) $report->getRequest()->getUri();
+        $recipient = $recipientByEndpoint[$endpoint] ?? null;
+        if (!$recipient) continue;
+        if ($report->isSuccess()) {
+            $summary['sent']++;
+            $db->prepare('UPDATE deliveries SET selection_push_sent_at=:now,selection_last_error=NULL WHERE id=:id')->execute([':now' => now(), ':id' => $recipient['delivery_id']]);
+        } else {
+            $summary['failed']++;
+            $db->prepare('UPDATE deliveries SET selection_last_error=:error WHERE id=:id')->execute([':error' => substr($report->getReason(), 0, 500), ':id' => $recipient['delivery_id']]);
+            if ($report->isSubscriptionExpired()) $db->prepare('UPDATE subscriptions SET active=0 WHERE id=:id')->execute([':id' => $recipient['subscription_id']]);
+        }
+    }
+    audit($db, 'crew_selection_notifications_sent', $alarmId, $summary);
+    return $summary;
+}
+
+function tryAutoStartAssistance(PDO $db, array $config, string $alarmId): bool
 {
     $statement = $db->prepare('SELECT auto_start_assistance,assistance_started_at FROM alarms WHERE id=:id AND completed_at IS NULL LIMIT 1');
     $statement->execute([':id' => $alarmId]);
     $alarm = $statement->fetch();
     if (!$alarm || empty($alarm['auto_start_assistance']) || !empty($alarm['assistance_started_at'])) return false;
     $personIds = array_map(static fn(array $candidate): string => $candidate['personId'], acceptedCrewCandidates($db, $alarmId));
-    $result = startAssistanceWithCrew($db, $alarmId, $personIds, 'auto');
-    return !empty($result['ok']);
+    $result = startAssistanceWithCrew($db, $config, $alarmId, $personIds, 'auto');
+    return !empty($result['startedNow']);
 }
 
 function deliveryPayload(array $row): array
 {
-    return ['pushSentAt' => $row['push_sent_at'], 'appReceivedAt' => $row['app_received_at'], 'notificationShownAt' => $row['notification_shown_at'], 'response' => $row['response'], 'responseAt' => $row['response_at']];
+    return ['pushSentAt' => $row['push_sent_at'], 'appReceivedAt' => $row['app_received_at'], 'notificationShownAt' => $row['notification_shown_at'], 'response' => $row['response'], 'responseAt' => $row['response_at'], 'crewSelection' => $row['crew_selection'] ?? null, 'selectionPushSentAt' => $row['selection_push_sent_at'] ?? null];
 }
 
 function audit(PDO $db, string $event, ?string $alarmId, array $metadata): void
