@@ -5,6 +5,7 @@ En buildless pilot til Dansk Søredningsselskab med kontrolcentral, installerbar
 - SAR-kontrolcentral til at oprette og udsende maritime alarmer med leveringskvitteringer.
 - Installerbar besætnings-PWA med Web Push, systemlyd/vibration, SAR-tone, position, situationsmelding og valget Accepteret / Ej accepteret.
 - Aktiv alarm kan afsluttes fra kontrolcentralen; den fjernes derefter automatisk i registrerede apps.
+- Besætningsappen viser installeret version/build, kontrollerer serverens seneste version og kan hente en opdatering uden at slette parring eller push-token.
 - Projektmapping fra prototype til robust, integreret alarmplatform.
 
 Det færdige produkt har et bindende skaleringskrav på mindst 14 aktive stationer, flere fartøjer pr. station, samtidige hændelser og tværgående nabostationsindsats. MVP'en har nu et multi-stationsfundament, men kun Køge har konfigurerede pilotfartøjer og aktiv afprøvning.

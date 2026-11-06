@@ -1,5 +1,7 @@
 const STORAGE = { alarms: 'dsrs.alarms.v2', current: 'dsrs.current.v2', responses: 'dsrs.responses.v2', delivery: 'dsrs.delivery.v2', logs: 'dsrs.logs.v2' };
 const API = 'api/index.php';
+const APP_VERSION = '0.11.0';
+const APP_BUILD = 25;
 const DEVICE = { token: 'dsrs.deviceToken.v1', id: 'dsrs.deviceId.v1', name: 'dsrs.crewName.v1', station: 'dsrs.stationId.v1', stationName: 'dsrs.stationName.v1', person: 'dsrs.personId.v1', role: 'dsrs.roleId.v1', roleName: 'dsrs.roleName.v1', competencies: 'dsrs.competencyIds.v1', repair: 'dsrs.deviceRepair.v1' };
 const channel = 'BroadcastChannel' in window ? new BroadcastChannel('alarmberedskab') : null;
 const crew = [
@@ -59,6 +61,13 @@ function time(value){return new Intl.DateTimeFormat('da-DK',{hour:'2-digit',minu
 function dateTime(value){return new Intl.DateTimeFormat('da-DK',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(value))}
 function showToast(message,error=false){const el=document.querySelector('#toast');el.textContent=message;el.className='toast show'+(error?' error':'');clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>el.className='toast',3200)}
 async function api(action,{method='GET',body,token,csrf,query={}}={}){const headers={Accept:'application/json'};if(body!==undefined)headers['Content-Type']='application/json';if(token)headers.Authorization=`Bearer ${token}`;if(csrf)headers['X-CSRF-Token']=csrf;const parameters=new URLSearchParams({action,...query});const response=await fetch(`${API}?${parameters}`,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:'same-origin'});const data=await response.json().catch(()=>({ok:false,error:'Ugyldigt svar fra serveren.'}));if(!response.ok)throw new Error(data.error||`Serverfejl ${response.status}`);return data}
+
+function setAppVersionStatus(message,state=''){const label=document.querySelector('#app-version-label');const status=document.querySelector('#app-version-status');const card=document.querySelector('.app-version-card');if(label)label.textContent=`Version ${APP_VERSION} · build ${APP_BUILD}`;if(status)status.textContent=message;if(card)card.dataset.versionState=state}
+async function fetchLatestVersion(){const response=await fetch(`version.json?check=${Date.now()}`,{cache:'no-store',headers:{Accept:'application/json'}});if(!response.ok)throw new Error('Versionsserveren svarede ikke.');const latest=await response.json();if(!latest.version||!Number.isFinite(Number(latest.build)))throw new Error('Serverens versionsoplysninger er ugyldige.');return {...latest,build:Number(latest.build)}}
+async function checkAppVersion(){try{const latest=await fetchLatestVersion();const current=Number(APP_BUILD);if(latest.build>current)setAppVersionStatus(`Ny version ${latest.version} · build ${latest.build} er klar.`,'outdated');else if(latest.build===current)setAppVersionStatus('Du har den nyeste version.','current');else setAppVersionStatus('Denne testversion er nyere end serverversionen.','preview');return latest}catch(error){setAppVersionStatus('Kunne ikke kontrollere serverversionen. Kontrollér forbindelsen.','error');return null}}
+function waitForWorker(worker,timeout=8000){if(!worker||worker.state==='activated')return Promise.resolve();return Promise.race([new Promise(resolve=>worker.addEventListener('statechange',()=>{if(worker.state==='activated'||worker.state==='redundant')resolve()},{passive:true})),new Promise(resolve=>setTimeout(resolve,timeout))])}
+async function updateAppToLatest(){const button=document.querySelector('#app-update-button');if(currentAlarm()){showToast('Afslut den aktive alarm før appen opdateres.',true);return}const original=button.textContent;button.disabled=true;button.textContent='Henter nyeste version …';setAppVersionStatus('Kontrollerer og henter nyeste appversion.','updating');try{const latest=await fetchLatestVersion();if('serviceWorker'in navigator){const registration=await navigator.serviceWorker.getRegistration('./')||await ensureServiceWorker();await registration.update();const worker=registration.installing||registration.waiting;registration.waiting?.postMessage({type:'SKIP_WAITING'});await waitForWorker(worker)}if('caches'in window){const keys=await caches.keys();await Promise.all(keys.filter(key=>key.startsWith('dsrs-operativ-')).map(key=>caches.delete(key)))}sessionStorage.setItem('dsrs.appUpdated.v1',JSON.stringify({version:latest.version,build:latest.build}));const target=new URL(location.href);target.searchParams.set('appUpdate',String(Date.now()));location.replace(target.href)}catch(error){setAppVersionStatus(`Opdatering mislykkedes: ${error.message}`,'error');showToast('Appen kunne ikke opdateres. Prøv igen med internetforbindelse.',true);button.disabled=false;button.textContent=original}}
+function showAppUpdateResult(){const raw=sessionStorage.getItem('dsrs.appUpdated.v1');if(!raw)return;sessionStorage.removeItem('dsrs.appUpdated.v1');try{const result=JSON.parse(raw);showToast(`DSRS SAR er opdateret til version ${result.version} · build ${result.build}.`)}catch{showToast('DSRS SAR er opdateret.')}}
 
 function stations(){return Array.isArray(backendConfig?.stations)&&backendConfig.stations.length?backendConfig.stations:fallbackStations}
 function stationById(id){return stations().find(station=>station.id===id)||stations().find(station=>station.id==='station-koege')||stations()[0]}
@@ -286,6 +295,7 @@ document.querySelectorAll('[data-response]').forEach(x=>x.addEventListener('clic
 document.querySelector('#complete-alarm-button').addEventListener('click',()=>completeRemoteAlarm());
 document.querySelectorAll('[data-notification-action]').forEach(button=>button.addEventListener('click',enableNotifications));
 document.querySelector('#sound-test-button').addEventListener('click',()=>startAlarmSound(true));
+document.querySelector('#app-update-button').addEventListener('click',updateAppToLatest);
 document.querySelector('#new-tab-button').addEventListener('click',()=>window.open(location.origin+location.pathname+'#responder','alarmberedskab-app'));
 document.querySelector('#open-app-button').addEventListener('click',()=>location.hash='responder');
 document.querySelector('.menu-button').addEventListener('click',()=>document.querySelector('.sidebar').classList.toggle('open'));
@@ -303,6 +313,9 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPro
 window.addEventListener('appinstalled',()=>{deferredPrompt=null;updateInstallUI();showToast('DSRS SAR er installeret.')});
 document.querySelector('#install-button').addEventListener('click',installApp);
 updateInstallUI();
+setAppVersionStatus('Kontrollerer den nyeste version.');
+checkAppVersion();
+showAppUpdateResult();
 if('serviceWorker'in navigator)ensureServiceWorker().catch(()=>showToast('Appens offline-funktion kunne ikke startes.',true));
 navigator.serviceWorker?.addEventListener('message',event=>{if(event.data?.type==='push-alarm'&&event.data.payload?.alarm){const alarm={...event.data.payload.alarm,deliveryToken:event.data.payload.deliveryToken};write(STORAGE.current,alarm);write(STORAGE.delivery,{alarmId:alarm.id,createdAt:alarm.createdAt,pushSentAt:new Date().toISOString(),appReceivedAt:new Date().toISOString(),notificationShownAt:new Date().toISOString()});renderAlarm();startAlarmSoundOnce(alarm);showToast(`Ny SAR-alarm: ${alarm.type}`)}});
 initialiseBackend();

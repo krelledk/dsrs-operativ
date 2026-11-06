@@ -16,6 +16,7 @@ Senest kontrolleret: 6. november 2026.
 - Feature detection for Notification, Service Worker og Push Manager.
 - Dynamisk viewport, safe-area-understøttelse og korrektion af Androids desktop-viewport.
 - Network-first navigation og versionsstyret app-shell-cache.
+- Synligt versions- og buildnummer samt manuel opdateringskontrol, der rydder gamle app-caches uden at slette enhedens parring eller push-token. Opdatering blokeres under en aktiv alarm.
 - Krypteret standardsbaseret Web Push med leveringskvitteringer.
 - Systemlyd anmodes med `silent: false`; kompatible Android-enheder får vibrationsmønster.
 - Gentaget SAR-tone i forgrunden via en genereret WAV/HTML-audiofil med Web Audio som fallback; den fortsætter, indtil redderen svarer, eller alarmen afsluttes.

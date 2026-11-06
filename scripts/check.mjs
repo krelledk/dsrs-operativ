@@ -6,6 +6,7 @@ const required = [
   'dist/styles.css',
   'dist/app.js',
   'dist/service-worker.js',
+  'dist/version.json',
   'dist/manifest.webmanifest',
   'dist/api/index.php',
   'server/setup.php',
@@ -40,10 +41,10 @@ for (const size of ['192x192', '512x512']) {
   if (!manifest.icons?.some((icon) => icon.sizes === size && icon.type === 'image/png')) throw new Error(`PWA-ikon mangler: ${size}`);
 }
 if (!manifest.icons?.some((icon) => icon.purpose === 'maskable')) throw new Error('Maskable PWA-ikon mangler.');
-for (const marker of ['DSRS', 'SAR kontrolcentral', 'Accepteret', 'Ej accepteret', 'Test lyd', 'Afslut alarm', 'Par denne mobil', 'Koordinator', 'Tilføj / redigér', 'Primær rolle', 'Kompetencer', 'FireServiceRota', 'Maritim mission', 'Minimum sikkert crew', '14+ stationer', 'Samtidige hændelser']) {
+for (const marker of ['DSRS', 'SAR kontrolcentral', 'Accepteret', 'Ej accepteret', 'Test lyd', 'Afslut alarm', 'Par denne mobil', 'APPVERSION', 'Søg efter opdatering', 'Koordinator', 'Tilføj / redigér', 'Primær rolle', 'Kompetencer', 'FireServiceRota', 'Maritim mission', 'Minimum sikkert crew', '14+ stationer', 'Samtidige hændelser']) {
   if (!html.includes(marker)) throw new Error(`Påkrævet UI-markør mangler: ${marker}`);
 }
-for (const marker of ['startAlarmSound', 'alarmSoundPersistent', 'renderDeliveryWarning', 'loadCoordinators', 'coordinator-save', 'primeAlarmSound', 'createAlarmWav', 'completeRemoteAlarm', 'loadCurrentAlarm(true)', 'renewDeviceRegistration', 'freshPushSubscription(true)', 'updateMobilePairing', 'populateCrewProfile', 'storePersonProfile', 'isResponderApp()){write(STORAGE.current,null)', 'isResponderApp()&&width>480']) {
+for (const marker of ['APP_VERSION', 'APP_BUILD', 'checkAppVersion', 'updateAppToLatest', 'dsrs.appUpdated.v1', 'startAlarmSound', 'alarmSoundPersistent', 'renderDeliveryWarning', 'loadCoordinators', 'coordinator-save', 'primeAlarmSound', 'createAlarmWav', 'completeRemoteAlarm', 'loadCurrentAlarm(true)', 'renewDeviceRegistration', 'freshPushSubscription(true)', 'updateMobilePairing', 'populateCrewProfile', 'storePersonProfile', 'isResponderApp()){write(STORAGE.current,null)', 'isResponderApp()&&width>480']) {
   if (!app.includes(marker)) throw new Error(`Alarmlyd/fallback mangler: ${marker}`);
 }
 const api = await readFile('dist/api/index.php', 'utf8');

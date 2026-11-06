@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=24">
+  <link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body>
   <div class="shell">
@@ -217,6 +217,14 @@
                 <span class="eyebrow">SENESTE HÆNDELSER</span>
                 <div id="mobile-history"></div>
               </section>
+              <section class="app-card app-version-card">
+                <div class="app-version-copy">
+                  <span class="eyebrow">APPVERSION</span>
+                  <b id="app-version-label">Version indlæses …</b>
+                  <small id="app-version-status" aria-live="polite">Kontrollerer den nyeste version.</small>
+                </div>
+                <button id="app-update-button" type="button">Søg efter opdatering</button>
+              </section>
             </div>
             <nav class="app-tabbar"><span class="selected">◉<small>Alarm</small></span><span>◷<small>Vagt</small></span><span>◇<small>Status</small></span><span>☰<small>Mere</small></span></nav>
           </section>
@@ -388,6 +396,6 @@
       <button class="primary-button" type="submit">Registrer og aktivér push</button>
     </form>
   </dialog>
-<script src="app.js?v=24"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>
