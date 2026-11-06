@@ -14,7 +14,8 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=25">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="styles.css?v=26">
 </head>
 <body>
   <div class="shell">
@@ -125,8 +126,13 @@
               </div>
               <small id="coordinator-help" class="field-help coordinator-preview">Vælg en koordinator for at sende navn, telefon og position med alarmen.</small>
               <label>Position / farvand
-                <div class="input-with-icon"><span>⌖</span><input id="alarm-location" required value="55°27.90'N · 12°12.45'E · Køge Bugt"></div>
+                <div class="input-with-icon"><span>⌖</span><input id="alarm-location" required placeholder="Vælg koordinator eller klik på kortet"></div>
               </label>
+              <section class="alarm-map-block" aria-labelledby="alarm-map-title">
+                <div class="alarm-map-heading"><div><b id="alarm-map-title">Vælg alarmposition på kort</b><small>Brug kortet, hvis alarmen ikke kommer fra en koordinator i listen.</small></div><span id="alarm-position-source">Ingen position valgt</span></div>
+                <div id="alarm-position-map" aria-label="Klikbart kort til valg af alarmposition"></div>
+                <p id="alarm-map-status" class="alarm-map-status" role="status" aria-live="polite">Vælg en koordinator ovenfor eller klik på den præcise position i kortet.</p>
+              </section>
               <label>Situationsmelding
                 <textarea id="alarm-message" rows="3">Sejlbåd med motorstop og drivende mod sydøst. 3 personer ombord, alle bærer redningsvest. Vind 8 m/s V.</textarea>
               </label>
@@ -396,6 +402,7 @@
       <button class="primary-button" type="submit">Registrer og aktivér push</button>
     </form>
   </dialog>
-<script src="app.js?v=25"></script>
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>

@@ -4,6 +4,8 @@
 
 - Koordinatorer er egne, stationsopdelte poster med navn, telefon, breddegrad og længdegrad.
 - Kontrolcentralen kan oprette eller redigere en koordinator og vælge vedkommende i alarmformularen.
+- Køge har en tydeligt mærket testkoordinator (`[TESTDATA]`), som aldrig må forveksles med en operativ kontakt.
+- Hvis ingen koordinator vælges, skal operatøren vælge alarmpositionen på det klikbare kort. Et kortklik rydder koordinatorvalget og gemmer decimal-koordinater samt kilden `map` på alarmen.
 - Alarmen gemmer et uforanderligt øjebliksbillede af kontaktoplysningerne. En senere rettelse af koordinatoren ændrer derfor ikke historiske alarmer.
 - Koordinatoren sendes kun til den valgte stations registrerede alarmmodtagere og vises med klikbart telefonnummer i besætningsappen.
 - Forgrundslyden gentages, indtil redderen svarer, eller kontrolcentralen afslutter alarmen.
