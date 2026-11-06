@@ -17,7 +17,7 @@ Pilotdomæne: `https://alarm.hansenlabs.dk`.
 
 Se [mobil-, web- og pushkompatibilitet](docs/MOBILE-AND-PUSH-COMPATIBILITY.md) og den samlede [produktbenchmark, maritime funktionskortlægning og roadmap](docs/PRODUCT-BENCHMARK-AND-ROADMAP.md).
 
-Fase 1 er påbegyndt med det [bagudkompatible multi-station- og fartøjsfundament](docs/PHASE-1-MULTI-STATION-FOUNDATION.md) samt [person-, medlemskabs- og kompetencegrundlaget](docs/PHASE-1B-CREW-IDENTITY.md).
+Fase 1 er påbegyndt med det [bagudkompatible multi-station- og fartøjsfundament](docs/PHASE-1-MULTI-STATION-FOUNDATION.md), [person-, medlemskabs- og kompetencegrundlaget](docs/PHASE-1B-CREW-IDENTITY.md) samt [stationskoordinatorer og alarmsikkerhed](docs/PHASE-1C-COORDINATORS-AND-ALARM-SAFETY.md).
 
 ## Ejerskab og versionering
 

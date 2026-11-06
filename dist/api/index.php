@@ -40,11 +40,11 @@ $method = (string) $_SERVER['REQUEST_METHOD'];
 
 try {
     if ($action === 'health' && $method === 'GET') {
-        respond(['ok' => true, 'service' => 'DSRS SAR pilotbackend', 'version' => '0.3.0', 'time' => now()]);
+        respond(['ok' => true, 'service' => 'DSRS SAR pilotbackend', 'version' => '0.4.0', 'time' => now()]);
     }
 
     if ($action === 'config' && $method === 'GET') {
-        respond(['ok' => true, 'vapidPublicKey' => $config['vapid_public'], 'backendVersion' => '0.3.0', 'stations' => publicStations($db), 'crewProfile' => crewProfileOptions($db)]);
+        respond(['ok' => true, 'vapidPublicKey' => $config['vapid_public'], 'backendVersion' => '0.4.0', 'stations' => publicStations($db), 'crewProfile' => crewProfileOptions($db)]);
     }
 
     if ($action === 'session' && $method === 'GET') {
@@ -72,6 +72,43 @@ try {
         $_SESSION = [];
         session_destroy();
         respond(['ok' => true]);
+    }
+
+    if ($action === 'coordinators' && $method === 'GET') {
+        requireAdmin();
+        $stationId = clean((string) ($_GET['stationId'] ?? ''), 80);
+        $statement = $db->prepare('SELECT id,name,phone,latitude,longitude FROM coordinators WHERE station_id=:station_id AND active=1 ORDER BY name');
+        $statement->execute([':station_id' => $stationId]);
+        respond(['ok' => true, 'coordinators' => array_map('coordinatorPayload', $statement->fetchAll())]);
+    }
+
+    if ($action === 'coordinator-save' && $method === 'POST') {
+        requireAdmin();
+        requireCsrf();
+        $body = body();
+        $id = clean((string) ($body['id'] ?? ''), 100);
+        $stationId = clean((string) ($body['stationId'] ?? ''), 80);
+        $name = clean((string) ($body['name'] ?? ''), 100);
+        $phone = clean((string) ($body['phone'] ?? ''), 40);
+        $latitude = filter_var($body['latitude'] ?? null, FILTER_VALIDATE_FLOAT);
+        $longitude = filter_var($body['longitude'] ?? null, FILTER_VALIDATE_FLOAT);
+        $stationStatement = $db->prepare('SELECT id FROM stations WHERE id=:id AND active=1 LIMIT 1');
+        $stationStatement->execute([':id' => $stationId]);
+        if (!$stationStatement->fetch()) respond(['ok' => false, 'error' => 'Den valgte station findes ikke.'], 422);
+        if ($name === '' || !preg_match('/^[+0-9() .-]{6,40}$/', $phone)) respond(['ok' => false, 'error' => 'Angiv navn og et gyldigt telefonnummer.'], 422);
+        if ($latitude === false || $longitude === false || $latitude < -90 || $latitude > 90 || $longitude < -180 || $longitude > 180) respond(['ok' => false, 'error' => 'Koordinatorens koordinater er ugyldige.'], 422);
+        $now = now();
+        if ($id !== '') {
+            $existingStatement = $db->prepare('SELECT id FROM coordinators WHERE id=:id AND station_id=:station_id LIMIT 1');
+            $existingStatement->execute([':id' => $id, ':station_id' => $stationId]);
+            if (!$existingStatement->fetch()) respond(['ok' => false, 'error' => 'Koordinatoren findes ikke på den valgte station.'], 404);
+            $db->prepare('UPDATE coordinators SET name=:name,phone=:phone,latitude=:latitude,longitude=:longitude,active=1,updated_at=:updated_at WHERE id=:id AND station_id=:station_id')->execute([':name' => $name, ':phone' => $phone, ':latitude' => $latitude, ':longitude' => $longitude, ':updated_at' => $now, ':id' => $id, ':station_id' => $stationId]);
+        } else {
+            $id = 'coordinator-' . bin2hex(random_bytes(10));
+            $db->prepare('INSERT INTO coordinators(id,station_id,name,phone,latitude,longitude,active,created_at,updated_at) VALUES(:id,:station_id,:name,:phone,:latitude,:longitude,1,:created_at,:updated_at)')->execute([':id' => $id, ':station_id' => $stationId, ':name' => $name, ':phone' => $phone, ':latitude' => $latitude, ':longitude' => $longitude, ':created_at' => $now, ':updated_at' => $now]);
+        }
+        audit($db, 'coordinator_saved', null, ['coordinatorId' => $id, 'stationId' => $stationId]);
+        respond(['ok' => true, 'coordinator' => coordinatorPayload(['id' => $id, 'name' => $name, 'phone' => $phone, 'latitude' => $latitude, 'longitude' => $longitude])]);
     }
 
     if ($action === 'subscribe' && $method === 'POST') {
@@ -177,6 +214,15 @@ try {
         $stationStatement->execute([':id' => $stationId]);
         $station = $stationStatement->fetch();
         if (!$station) respond(['ok' => false, 'error' => 'Den valgte station findes ikke eller er ikke aktiv.'], 422);
+        $coordinatorId = clean((string) ($body['coordinatorId'] ?? ''), 100);
+        $coordinator = null;
+        if ($coordinatorId !== '') {
+            $coordinatorStatement = $db->prepare('SELECT id,name,phone,latitude,longitude FROM coordinators WHERE id=:id AND station_id=:station_id AND active=1 LIMIT 1');
+            $coordinatorStatement->execute([':id' => $coordinatorId, ':station_id' => $stationId]);
+            $coordinatorRow = $coordinatorStatement->fetch();
+            if (!$coordinatorRow) respond(['ok' => false, 'error' => 'Den valgte koordinator tilhører ikke stationen.'], 422);
+            $coordinator = coordinatorPayload($coordinatorRow);
+        }
         $vesselIds = array_values(array_unique(array_slice(array_filter(array_map(fn($value) => clean((string) $value, 80), (array) ($body['vesselIds'] ?? []))), 0, 20)));
         if ($vesselIds !== []) {
             $placeholders = implode(',', array_fill(0, count($vesselIds), '?'));
@@ -188,6 +234,7 @@ try {
             'id' => bin2hex(random_bytes(12)),
             'stationId' => $station['id'],
             'stationName' => $station['name'],
+            'coordinator' => $coordinator,
             'vesselIds' => $vesselIds,
             'type' => clean((string) ($body['type'] ?? ''), 100),
             'priority' => clean((string) ($body['priority'] ?? 'high'), 20),
@@ -201,8 +248,8 @@ try {
         }
         $db->beginTransaction();
         $db->prepare("UPDATE alarms SET completed_at=:completed_at, completed_by='superseded' WHERE completed_at IS NULL AND station_id=:station_id")->execute([':completed_at' => now(), ':station_id' => $stationId]);
-        $db->prepare('INSERT INTO alarms(id,station_id,vessel_ids_json,type,priority,location,message,units_json,created_at,created_by) VALUES(:id,:station_id,:vessel_ids,:type,:priority,:location,:message,:units,:created_at,:created_by)')->execute([
-            ':id' => $alarm['id'], ':station_id' => $stationId, ':vessel_ids' => json_encode($vesselIds, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), ':type' => $alarm['type'], ':priority' => $alarm['priority'], ':location' => $alarm['location'], ':message' => $alarm['message'], ':units' => json_encode($alarm['units'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), ':created_at' => $alarm['createdAt'], ':created_by' => 'control',
+        $db->prepare('INSERT INTO alarms(id,station_id,coordinator_id,coordinator_snapshot_json,vessel_ids_json,type,priority,location,message,units_json,created_at,created_by) VALUES(:id,:station_id,:coordinator_id,:coordinator_snapshot,:vessel_ids,:type,:priority,:location,:message,:units,:created_at,:created_by)')->execute([
+            ':id' => $alarm['id'], ':station_id' => $stationId, ':coordinator_id' => $coordinatorId ?: null, ':coordinator_snapshot' => $coordinator ? json_encode($coordinator, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) : null, ':vessel_ids' => json_encode($vesselIds, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), ':type' => $alarm['type'], ':priority' => $alarm['priority'], ':location' => $alarm['location'], ':message' => $alarm['message'], ':units' => json_encode($alarm['units'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), ':created_at' => $alarm['createdAt'], ':created_by' => 'control',
         ]);
         $subscriptionStatement = $db->prepare('SELECT * FROM subscriptions WHERE active=1 AND station_id=:station_id ORDER BY id');
         $subscriptionStatement->execute([':station_id' => $stationId]);
@@ -244,7 +291,7 @@ try {
                 if ($report->isSubscriptionExpired()) $db->prepare('UPDATE subscriptions SET active=0 WHERE id=:id')->execute([':id' => $delivery['subscription']['id']]);
             }
         }
-        audit($db, 'alarm_dispatched', $alarm['id'], ['stationId' => $stationId, 'vesselIds' => $vesselIds, 'subscriptions' => count($subscriptions), 'sent' => $sent, 'failed' => $failed]);
+        audit($db, 'alarm_dispatched', $alarm['id'], ['stationId' => $stationId, 'coordinatorId' => $coordinatorId ?: null, 'vesselIds' => $vesselIds, 'subscriptions' => count($subscriptions), 'sent' => $sent, 'failed' => $failed]);
         respond(['ok' => true, 'alarm' => $alarm, 'delivery' => ['recipients' => count($subscriptions), 'sent' => $sent, 'failed' => $failed]]);
     }
 
@@ -303,8 +350,9 @@ function database(string $path): PDO
     $db->exec('CREATE TABLE IF NOT EXISTS station_memberships (id INTEGER PRIMARY KEY AUTOINCREMENT, person_id TEXT NOT NULL, station_id TEXT NOT NULL, role_id TEXT NOT NULL, role_status TEXT NOT NULL DEFAULT \'unverified\', active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(person_id,station_id), FOREIGN KEY(person_id) REFERENCES people(id), FOREIGN KEY(station_id) REFERENCES stations(id), FOREIGN KEY(role_id) REFERENCES roles(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS person_competencies (person_id TEXT NOT NULL, competency_id TEXT NOT NULL, verification_status TEXT NOT NULL DEFAULT \'self_declared\', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(person_id,competency_id), FOREIGN KEY(person_id) REFERENCES people(id), FOREIGN KEY(competency_id) REFERENCES competencies(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS vessel_competency_requirements (vessel_id TEXT NOT NULL, competency_id TEXT NOT NULL, required_count INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(vessel_id,competency_id), FOREIGN KEY(vessel_id) REFERENCES vessels(id), FOREIGN KEY(competency_id) REFERENCES competencies(id));');
+    $db->exec('CREATE TABLE IF NOT EXISTS coordinators (id TEXT PRIMARY KEY, station_id TEXT NOT NULL, name TEXT NOT NULL, phone TEXT NOT NULL, latitude REAL NOT NULL, longitude REAL NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(station_id) REFERENCES stations(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, endpoint TEXT NOT NULL UNIQUE, subscription_json TEXT NOT NULL, device_id TEXT NOT NULL, device_token_hash TEXT NOT NULL, crew_name TEXT NOT NULL, station TEXT NOT NULL, station_id TEXT, person_id TEXT, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_seen_at TEXT);');
-    $db->exec('CREATE TABLE IF NOT EXISTS alarms (id TEXT PRIMARY KEY, station_id TEXT, vessel_ids_json TEXT NOT NULL DEFAULT \'[]\', type TEXT NOT NULL, priority TEXT NOT NULL, location TEXT NOT NULL, message TEXT NOT NULL, units_json TEXT NOT NULL, created_at TEXT NOT NULL, created_by TEXT NOT NULL, completed_at TEXT, completed_by TEXT);');
+    $db->exec('CREATE TABLE IF NOT EXISTS alarms (id TEXT PRIMARY KEY, station_id TEXT, coordinator_id TEXT, coordinator_snapshot_json TEXT, vessel_ids_json TEXT NOT NULL DEFAULT \'[]\', type TEXT NOT NULL, priority TEXT NOT NULL, location TEXT NOT NULL, message TEXT NOT NULL, units_json TEXT NOT NULL, created_at TEXT NOT NULL, created_by TEXT NOT NULL, completed_at TEXT, completed_by TEXT);');
     $db->exec('CREATE TABLE IF NOT EXISTS deliveries (id INTEGER PRIMARY KEY AUTOINCREMENT, alarm_id TEXT NOT NULL, subscription_id INTEGER NOT NULL, delivery_token TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, push_sent_at TEXT, app_received_at TEXT, notification_shown_at TEXT, response TEXT, response_at TEXT, last_error TEXT, FOREIGN KEY(alarm_id) REFERENCES alarms(id), FOREIGN KEY(subscription_id) REFERENCES subscriptions(id));');
     $db->exec('CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, alarm_id TEXT, metadata_json TEXT NOT NULL, created_at TEXT NOT NULL);');
 
@@ -312,6 +360,8 @@ function database(string $path): PDO
     if (!in_array('completed_at', $alarmColumns, true)) $db->exec('ALTER TABLE alarms ADD COLUMN completed_at TEXT');
     if (!in_array('completed_by', $alarmColumns, true)) $db->exec('ALTER TABLE alarms ADD COLUMN completed_by TEXT');
     if (!in_array('station_id', $alarmColumns, true)) $db->exec('ALTER TABLE alarms ADD COLUMN station_id TEXT');
+    if (!in_array('coordinator_id', $alarmColumns, true)) $db->exec('ALTER TABLE alarms ADD COLUMN coordinator_id TEXT');
+    if (!in_array('coordinator_snapshot_json', $alarmColumns, true)) $db->exec('ALTER TABLE alarms ADD COLUMN coordinator_snapshot_json TEXT');
     if (!in_array('vessel_ids_json', $alarmColumns, true)) $db->exec("ALTER TABLE alarms ADD COLUMN vessel_ids_json TEXT NOT NULL DEFAULT '[]'");
     $subscriptionColumns = array_column($db->query('PRAGMA table_info(subscriptions)')->fetchAll(), 'name');
     if (!in_array('station_id', $subscriptionColumns, true)) $db->exec('ALTER TABLE subscriptions ADD COLUMN station_id TEXT');
@@ -356,7 +406,7 @@ function database(string $path): PDO
         $profile = ensureCrewProfile($db, (string) $legacySubscription['crew_name'], (string) $legacySubscription['station_id'], 'role-crew', [], null, false);
         $db->prepare('UPDATE subscriptions SET person_id=:person_id WHERE id=:id')->execute([':person_id' => $profile['id'], ':id' => $legacySubscription['id']]);
     }
-    $db->exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_token ON subscriptions(device_token_hash); CREATE INDEX IF NOT EXISTS idx_subscriptions_station ON subscriptions(station_id,active); CREATE INDEX IF NOT EXISTS idx_subscriptions_person ON subscriptions(person_id,active); CREATE INDEX IF NOT EXISTS idx_memberships_station ON station_memberships(station_id,active); CREATE INDEX IF NOT EXISTS idx_alarms_station_active ON alarms(station_id,completed_at,created_at); CREATE INDEX IF NOT EXISTS idx_deliveries_alarm ON deliveries(alarm_id);');
+    $db->exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_token ON subscriptions(device_token_hash); CREATE INDEX IF NOT EXISTS idx_subscriptions_station ON subscriptions(station_id,active); CREATE INDEX IF NOT EXISTS idx_subscriptions_person ON subscriptions(person_id,active); CREATE INDEX IF NOT EXISTS idx_memberships_station ON station_memberships(station_id,active); CREATE INDEX IF NOT EXISTS idx_coordinators_station ON coordinators(station_id,active,name); CREATE INDEX IF NOT EXISTS idx_alarms_station_active ON alarms(station_id,completed_at,created_at); CREATE INDEX IF NOT EXISTS idx_deliveries_alarm ON deliveries(alarm_id);');
     return $db;
 }
 
@@ -400,9 +450,15 @@ function requireDevice(PDO $db): array
 
 function alarmPayload(array $row, ?string $deliveryToken = null): array
 {
-    $payload = ['id' => $row['id'], 'stationId' => $row['station_id'] ?? 'station-koege', 'stationName' => $row['station_name'] ?? 'DSRS Køge', 'vesselIds' => json_decode((string) ($row['vessel_ids_json'] ?? '[]'), true) ?: [], 'type' => $row['type'], 'priority' => $row['priority'], 'location' => $row['location'], 'message' => $row['message'], 'units' => json_decode($row['units_json'], true) ?: [], 'createdAt' => $row['created_at']];
+    $coordinator = json_decode((string) ($row['coordinator_snapshot_json'] ?? ''), true);
+    $payload = ['id' => $row['id'], 'stationId' => $row['station_id'] ?? 'station-koege', 'stationName' => $row['station_name'] ?? 'DSRS Køge', 'coordinator' => is_array($coordinator) ? $coordinator : null, 'vesselIds' => json_decode((string) ($row['vessel_ids_json'] ?? '[]'), true) ?: [], 'type' => $row['type'], 'priority' => $row['priority'], 'location' => $row['location'], 'message' => $row['message'], 'units' => json_decode($row['units_json'], true) ?: [], 'createdAt' => $row['created_at']];
     if ($deliveryToken !== null) $payload['deliveryToken'] = $deliveryToken;
     return $payload;
+}
+
+function coordinatorPayload(array $row): array
+{
+    return ['id' => (string) $row['id'], 'name' => (string) $row['name'], 'phone' => (string) $row['phone'], 'latitude' => (float) $row['latitude'], 'longitude' => (float) $row['longitude']];
 }
 
 function crewProfileOptions(PDO $db): array

@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="styles.css?v=22">
+  <link rel="stylesheet" href="styles.css?v=24">
 </head>
 <body>
   <div class="shell">
@@ -115,6 +115,15 @@
                 </select>
                 <small id="dispatch-station-help" class="field-help">Alarmen sendes kun til den valgte stations registrerede enheder.</small>
               </label>
+              <div class="coordinator-field">
+                <label>Koordinator
+                  <select id="alarm-coordinator" aria-describedby="coordinator-help">
+                    <option value="">Vælg koordinator</option>
+                  </select>
+                </label>
+                <button class="coordinator-manage-button" id="manage-coordinators" type="button">Tilføj / redigér</button>
+              </div>
+              <small id="coordinator-help" class="field-help coordinator-preview">Vælg en koordinator for at sende navn, telefon og position med alarmen.</small>
               <label>Position / farvand
                 <div class="input-with-icon"><span>⌖</span><input id="alarm-location" required value="55°27.90'N · 12°12.45'E · Køge Bugt"></div>
               </label>
@@ -146,6 +155,7 @@
               </div>
             </div>
             <div id="latest-alarm-summary" class="alarm-summary"></div>
+            <div id="delivery-warning" class="delivery-warning" role="alert" hidden></div>
             <div class="sea-chart" aria-label="Søkort over alarmpositionen">
               <div class="chart-grid"></div><div class="coast coast-a"></div><div class="coast coast-b"></div>
               <span class="chart-label label-koge">KØGE</span><span class="chart-label label-stevns">STEVNS</span>
@@ -335,6 +345,23 @@
       <button class="primary-button" type="submit">Log ind og fortsæt</button>
     </form>
   </dialog>
+  <dialog id="coordinator-dialog" class="install-dialog" aria-labelledby="coordinator-dialog-title">
+    <form id="coordinator-form">
+      <button class="dialog-close" id="coordinator-dialog-close" type="button" aria-label="Luk">×</button>
+      <span class="eyebrow">STATIONENS KONTAKTER</span>
+      <h2 id="coordinator-dialog-title">Koordinator</h2>
+      <p class="dialog-copy">Kontaktoplysningerne gemmes på den valgte station og medtages som et historisk øjebliksbillede i alarmen.</p>
+      <input id="coordinator-id" type="hidden">
+      <label>Navn<input id="coordinator-name" required maxlength="100" autocomplete="name"></label>
+      <label>Telefon<input id="coordinator-phone" required maxlength="40" autocomplete="tel" inputmode="tel" placeholder="+45 12 34 56 78"></label>
+      <div class="field-row coordinator-coordinates">
+        <label>Breddegrad<input id="coordinator-latitude" required type="number" min="-90" max="90" step="any" inputmode="decimal" placeholder="55.4583"></label>
+        <label>Længdegrad<input id="coordinator-longitude" required type="number" min="-180" max="180" step="any" inputmode="decimal" placeholder="12.1833"></label>
+      </div>
+      <p id="coordinator-status" class="device-status" role="status" aria-live="polite">Koordinatoren bliver kun synlig for kontrolcentralen og den valgte stations alarmmodtagere.</p>
+      <button class="primary-button" type="submit">Gem koordinator</button>
+    </form>
+  </dialog>
   <dialog id="device-dialog" class="install-dialog" aria-labelledby="device-dialog-title">
     <form id="device-form">
       <button class="dialog-close" id="device-dialog-close" type="button" aria-label="Luk">×</button>
@@ -361,6 +388,6 @@
       <button class="primary-button" type="submit">Registrer og aktivér push</button>
     </form>
   </dialog>
-<script src="app.js?v=22"></script>
+<script src="app.js?v=24"></script>
 </body>
 </html>
